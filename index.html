@@ -43,8 +43,8 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
       }
     }
     const [salesProfit,dashboardDrilldown]=await Promise.all([
-      addon('assets/sales-net-profit-safe-v2.js'),
-      addon('assets/dashboard-drilldown-v1.js')
+      addon('assets/sales-net-profit-safe-v2.js?v=20260816-1947'),
+      addon('assets/dashboard-drilldown-v1.js?v=bc73f1bf')
     ]);
     const extras=[salesProfit,dashboardDrilldown].filter(Boolean).map(js=>'<script>'+js+'<\\/script>').join('');
     if(extras) html=html.replace('</body>',extras+'</body>');
