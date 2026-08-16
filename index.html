@@ -15,29 +15,45 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
   const box=document.getElementById('ecohub-loader');
   try{
     const paths=[
-      'assets/ecohub-v5-p01.txt',
-      'assets/ecohub-v5-p02.txt',
-      'assets/ecohub-v5-p03a.txt',
-      'assets/ecohub-v5-p03b.txt',
-      'assets/ecohub-v5-p03c.txt',
+      'assets/ecohub-v5-p01.txt','assets/ecohub-v5-p02.txt',
+      'assets/ecohub-v5-p03a.txt','assets/ecohub-v5-p03b.txt','assets/ecohub-v5-p03c.txt',
       'assets/ecohub-v5-p04.txt',
-      'assets/ecohub-v5-p05a.txt',
-      'assets/ecohub-v5-p05b.txt',
-      'assets/ecohub-v5-p05c.txt',
-      'assets/ecohub-v5-p06.txt',
-      'assets/ecohub-v5-p07.txt',
-      'assets/ecohub-v5-p08.txt'
+      'assets/ecohub-v5-p05a.txt','assets/ecohub-v5-p05b.txt','assets/ecohub-v5-p05c.txt',
+      'assets/ecohub-v5-p06.txt','assets/ecohub-v5-p07.txt','assets/ecohub-v5-p08.txt'
     ];
-    const texts=await Promise.all(paths.map(async p=>{const r=await fetch(p,{cache:'no-store'});if(!r.ok)throw new Error(`Missing app file: ${p} (${r.status})`);return(await r.text()).trim();}));
+    const texts=await Promise.all(paths.map(async p=>{
+      const r=await fetch(p,{cache:'no-store'});
+      if(!r.ok) throw new Error(`Missing app file: ${p} (${r.status})`);
+      return (await r.text()).trim();
+    }));
     const binary=atob(texts.join(''));
     const bytes=new Uint8Array(binary.length);
-    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-    if(!('DecompressionStream' in window))throw new Error('Please update Safari/Chrome to open EcoHub.');
+    for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    if(!('DecompressionStream' in window)) throw new Error('Please update Safari/Chrome to open EcoHub.');
     let html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
-    const salesProfitHotfix=atob('KGZ1bmN0aW9uKCl7CiAgJ3VzZSBzdHJpY3QnOwogIGNvbnN0IEU9d2luZG93Ll9fZWNvaHViOwogIGlmKCFFIHx8IHdpbmRvdy5fX2Vjb2h1YlNhbGVzUHJvZml0U2FmZVYyKSByZXR1cm47CiAgY29uc3Qgb3JpZ2luYWw9RS5yZW5kZXJTYWxlczsKICBpZih0eXBlb2Ygb3JpZ2luYWwhPT0nZnVuY3Rpb24nKSByZXR1cm47CiAgd2luZG93Ll9fZWNvaHViU2FsZXNQcm9maXRTYWZlVjI9dHJ1ZTsKCiAgZnVuY3Rpb24gY2xpZW50TmFtZShxKXsKICAgIHRyeXsKICAgICAgY29uc3QgYz1FLmZpbmRDbGllbnRGb3JRdW90YXRpb24gPyBFLmZpbmRDbGllbnRGb3JRdW90YXRpb24ocSkgOiBudWxsOwogICAgICBpZihjICYmIEUuY2xpZW50RGlzcGxheU5hbWUpIHJldHVybiBFLmNsaWVudERpc3BsYXlOYW1lKGMpIHx8ICdVbmFzc2lnbmVkIENsaWVudCc7CiAgICB9Y2F0Y2goX2Upe30KICAgIHJldHVybiBTdHJpbmcoKHEmJnEuY29tcGFueSl8fChxJiZxLmN1c3RvbWVyKXx8J1VuYXNzaWduZWQgQ2xpZW50JykudHJpbSgpIHx8ICdVbmFzc2lnbmVkIENsaWVudCc7CiAgfQoKICBmdW5jdGlvbiBlc2Mocyl7IHJldHVybiBFLmVzY2FwZUh0bWwgPyBFLmVzY2FwZUh0bWwocykgOiBTdHJpbmcocz09bnVsbD8nJzpzKS5yZXBsYWNlKC9bJjw+IiddL2csYz0+KHsnJic6JyZhbXA7JywnPCc6JyZsdDsnLCc+JzonJmd0OycsJyInOicmcXVvdDsnLCInIjonJiMzOTsnfVtjXSkpOyB9CiAgZnVuY3Rpb24gbW9uZXkobil7IHJldHVybiBFLnBlc28gPyBFLnBlc28obikgOiAn4oKxJysoTnVtYmVyKG4pfHwwKS50b0xvY2FsZVN0cmluZyh1bmRlZmluZWQse21pbmltdW1GcmFjdGlvbkRpZ2l0czoyLG1heGltdW1GcmFjdGlvbkRpZ2l0czoyfSk7IH0KCiAgZnVuY3Rpb24gZ2V0Um93cygpewogICAgY29uc3QgcXM9KEUuc3RhdGUmJkFycmF5LmlzQXJyYXkoRS5zdGF0ZS5xdW90YXRpb25zKSk/RS5zdGF0ZS5xdW90YXRpb25zOltdOwogICAgcmV0dXJuIHFzLmZpbHRlcihxPT57CiAgICAgIHRyeXtyZXR1cm4gRS5pc1JldmVudWVSZWNvZ25pemVkID8gRS5pc1JldmVudWVSZWNvZ25pemVkKHEpIDogcSYmcS5vcmRlclN0YXR1cz09PSdDb21wbGV0ZWQnO30KICAgICAgY2F0Y2goX2Upe3JldHVybiBxJiZxLm9yZGVyU3RhdHVzPT09J0NvbXBsZXRlZCc7fQogICAgfSkubWFwKHE9PnsKICAgICAgY29uc3QgdD1FLnF1b3RhdGlvblRvdGFscyhxKTsKICAgICAgY29uc3QgcD1FLnF1b3RhdGlvblBheW1lbnRJbmZvKHEpOwogICAgICBjb25zdCBuZXQ9TnVtYmVyKHQubmV0KXx8MDsKICAgICAgY29uc3QgY29zdD1OdW1iZXIodC5jb2dzKXx8MDsKICAgICAgY29uc3QgcHJvZml0PU51bWJlcih0Lmdyb3NzUHJvZml0KXx8MDsKICAgICAgcmV0dXJuIHsKICAgICAgICBxLAogICAgICAgIGRhdGU6cS5jb21wbGV0ZWREYXRlfHxxLmRhdGV8fCcnLAogICAgICAgIGNsaWVudDpjbGllbnROYW1lKHEpLAogICAgICAgIG5ldCwKICAgICAgICBjb3N0LAogICAgICAgIHByb2ZpdCwKICAgICAgICBtYXJnaW46bmV0PjA/KHByb2ZpdC9uZXQpKjEwMDowLAogICAgICAgIHBhaWQ6TnVtYmVyKHAuYW1vdW50UGFpZCl8fDAsCiAgICAgICAgYmFsYW5jZTpOdW1iZXIocC5yZW1haW5pbmdCYWxhbmNlKXx8MAogICAgICB9OwogICAgfSkuc29ydCgoYSxiKT0+KGIuZGF0ZXx8JycpLmxvY2FsZUNvbXBhcmUoYS5kYXRlfHwnJykpOwogIH0KCiAgZnVuY3Rpb24gZW5oYW5jZShjb250YWluZXIpewogICAgdHJ5ewogICAgICBpZighY29udGFpbmVyIHx8ICFjb250YWluZXIucXVlcnlTZWxlY3RvcikgcmV0dXJuOwogICAgICBjb25zdCBncmlkPWNvbnRhaW5lci5xdWVyeVNlbGVjdG9yKCcua3BpLWdyaWQnKTsKICAgICAgaWYoIWdyaWQpIHJldHVybjsKCiAgICAgIGNvbnN0IGFsbD1nZXRSb3dzKCk7CiAgICAgIGNvbnN0IHNlYXJjaD1jb250YWluZXIucXVlcnlTZWxlY3RvcignI3NhbGVzLXNlYXJjaCcpOwogICAgICBjb25zdCBuZWVkbGU9U3RyaW5nKHNlYXJjaCYmc2VhcmNoLnZhbHVlfHwnJykudHJpbSgpLnRvTG93ZXJDYXNlKCk7CiAgICAgIGNvbnN0IHJvd3M9bmVlZGxlID8gYWxsLmZpbHRlcih4PT5TdHJpbmcoeC5jbGllbnQpLnRvTG93ZXJDYXNlKCkuaW5jbHVkZXMobmVlZGxlKXx8U3RyaW5nKHgucS5udW1iZXJ8fCcnKS50b0xvd2VyQ2FzZSgpLmluY2x1ZGVzKG5lZWRsZSkpIDogYWxsOwogICAgICBjb25zdCB0b3RhbFByb2ZpdD1hbGwucmVkdWNlKChzLHgpPT5zK3gucHJvZml0LDApOwogICAgICBjb25zdCB0b3RhbE5ldD1yb3dzLnJlZHVjZSgocyx4KT0+cyt4Lm5ldCwwKTsKICAgICAgY29uc3QgdG90YWxDb3N0PXJvd3MucmVkdWNlKChzLHgpPT5zK3guY29zdCwwKTsKICAgICAgY29uc3Qgc2hvd25Qcm9maXQ9cm93cy5yZWR1Y2UoKHMseCk9PnMreC5wcm9maXQsMCk7CiAgICAgIGNvbnN0IHRvdGFsUGFpZD1yb3dzLnJlZHVjZSgocyx4KT0+cyt4LnBhaWQsMCk7CiAgICAgIGNvbnN0IHRvdGFsQmFsYW5jZT1yb3dzLnJlZHVjZSgocyx4KT0+cyt4LmJhbGFuY2UsMCk7CgogICAgICBjb25zdCBrcGlzPWdyaWQucXVlcnlTZWxlY3RvckFsbCgnLmtwaScpOwogICAgICBpZihrcGlzLmxlbmd0aD49NCl7CiAgICAgICAgY29uc3QgbGJsPWtwaXNbM10ucXVlcnlTZWxlY3RvcignLmxibCcpOwogICAgICAgIGNvbnN0IHZhbD1rcGlzWzNdLnF1ZXJ5U2VsZWN0b3IoJy52YWwnKTsKICAgICAgICBpZihsYmwgJiYgbGJsLnRleHRDb250ZW50IT09J1RvdGFsIE5ldCBQcm9maXQnKSBsYmwudGV4dENvbnRlbnQ9J1RvdGFsIE5ldCBQcm9maXQnOwogICAgICAgIGlmKHZhbCAmJiB2YWwudGV4dENvbnRlbnQhPT1tb25leSh0b3RhbFByb2ZpdCkpIHZhbC50ZXh0Q29udGVudD1tb25leSh0b3RhbFByb2ZpdCk7CiAgICAgIH0KICAgICAgY29udGFpbmVyLnF1ZXJ5U2VsZWN0b3JBbGwoJ3RoJykuZm9yRWFjaCh0aD0+eyBpZih0aC50ZXh0Q29udGVudC50cmltKCk9PT0nR3Jvc3MgUHJvZml0JykgdGgudGV4dENvbnRlbnQ9J05ldCBQcm9maXQnOyB9KTsKCiAgICAgIGNvbnN0IHNpZ25hdHVyZT1uZWVkbGUrJ3wnK3Jvd3MubWFwKHg9Plt4LnEubnVtYmVyLHguZGF0ZSx4Lm5ldCx4LmNvc3QseC5wcm9maXQseC5wYWlkLHguYmFsYW5jZV0uam9pbignOicpKS5qb2luKCc7Jyk7CiAgICAgIGxldCBjYXJkPWNvbnRhaW5lci5xdWVyeVNlbGVjdG9yKCcjc2FsZXMtbmV0LXByb2ZpdC1jYXJkLXNhZmUnKTsKICAgICAgaWYoY2FyZCAmJiBjYXJkLmRhdGFzZXQuc2lnbmF0dXJlPT09c2lnbmF0dXJlKSByZXR1cm47CiAgICAgIGlmKGNhcmQpIGNhcmQucmVtb3ZlKCk7CgogICAgICBjYXJkPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpOwogICAgICBjYXJkLmlkPSdzYWxlcy1uZXQtcHJvZml0LWNhcmQtc2FmZSc7CiAgICAgIGNhcmQuY2xhc3NOYW1lPSdjYXJkJzsKICAgICAgY2FyZC5kYXRhc2V0LnNpZ25hdHVyZT1zaWduYXR1cmU7CiAgICAgIGNhcmQuc3R5bGUubWFyZ2luQm90dG9tPScxNHB4JzsKICAgICAgY2FyZC5pbm5lckhUTUw9YAogICAgICAgIDxkaXYgc3R5bGU9InBhZGRpbmc6MTRweCAxNnB4IDhweDtkaXNwbGF5OmZsZXg7anVzdGlmeS1jb250ZW50OnNwYWNlLWJldHdlZW47Z2FwOjEycHg7YWxpZ24taXRlbXM6Y2VudGVyO2ZsZXgtd3JhcDp3cmFwOyI+CiAgICAgICAgICA8ZGl2PjxiPk5ldCBQcm9maXQgYnkgQ29tcGxldGVkIFF1b3RhdGlvbjwvYj48ZGl2IHN0eWxlPSJmb250LXNpemU6MTEuNXB4O2NvbG9yOnZhcigtLWluay1zb2Z0KTttYXJnaW4tdG9wOjJweDsiPk5ldCBQcm9maXQgPSBOZXQgU2FsZXMgYWZ0ZXIgaXRlbSBkaXNjb3VudHMg4oiSIERpcmVjdCBQcm9kdWN0IENvc3QuPC9kaXY+PC9kaXY+CiAgICAgICAgICA8ZGl2IGNsYXNzPSJwaWxsIGdyZWVuIj4ke3Jvd3MubGVuZ3RoLnRvTG9jYWxlU3RyaW5nKCl9IHNob3duPC9kaXY+CiAgICAgICAgPC9kaXY+CiAgICAgICAgPGRpdiBjbGFzcz0idGFibGUtd3JhcCI+CiAgICAgICAgICA8dGFibGUgY2xhc3M9ImRhdGEiPgogICAgICAgICAgICA8dGhlYWQ+PHRyPjx0aD5Db21wbGV0ZWQ8L3RoPjx0aD5RdW90YXRpb24gTm8uPC90aD48dGg+Q2xpZW50PC90aD48dGggY2xhc3M9Im51bSI+TmV0IFNhbGVzPC90aD48dGggY2xhc3M9Im51bSI+RGlyZWN0IENvc3Q8L3RoPjx0aCBjbGFzcz0ibnVtIj5OZXQgUHJvZml0PC90aD48dGggY2xhc3M9Im51bSI+TWFyZ2luPC90aD48dGggY2xhc3M9Im51bSI+UGFpZDwvdGg+PHRoIGNsYXNzPSJudW0iPkJhbGFuY2U8L3RoPjwvdHI+PC90aGVhZD4KICAgICAgICAgICAgPHRib2R5PiR7cm93cy5sZW5ndGg/cm93cy5tYXAoeD0+YDx0cj48dGQ+JHtlc2MoeC5kYXRlfHwn4oCUJyl9PC90ZD48dGQ+PGI+JHtlc2MoeC5xLm51bWJlcnx8J+KAlCcpfTwvYj48L3RkPjx0ZD4ke2VzYyh4LmNsaWVudHx8J+KAlCcpfTwvdGQ+PHRkIGNsYXNzPSJudW0iPiR7bW9uZXkoeC5uZXQpfTwvdGQ+PHRkIGNsYXNzPSJudW0iPiR7bW9uZXkoeC5jb3N0KX08L3RkPjx0ZCBjbGFzcz0ibnVtIiBzdHlsZT0iZm9udC13ZWlnaHQ6OTAwO2NvbG9yOiR7eC5wcm9maXQ8MD8ndmFyKC0tcmVkKSc6J3ZhcigtLWdyZWVuKSd9OyI+JHttb25leSh4LnByb2ZpdCl9PC90ZD48dGQgY2xhc3M9Im51bSI+JHt4Lm1hcmdpbi50b0ZpeGVkKDEpfSU8L3RkPjx0ZCBjbGFzcz0ibnVtIj4ke21vbmV5KHgucGFpZCl9PC90ZD48dGQgY2xhc3M9Im51bSI+JHttb25leSh4LmJhbGFuY2UpfTwvdGQ+PC90cj5gKS5qb2luKCcnKTpgPHRyPjx0ZCBjb2xzcGFuPSI5Ij48ZGl2IGNsYXNzPSJlbXB0eS1zdGF0ZSI+JHthbGwubGVuZ3RoPydObyBjb21wbGV0ZWQgcXVvdGF0aW9uIG1hdGNoZXMgeW91ciBzZWFyY2guJzonTm8gY29tcGxldGVkIHNhbGVzIHlldC4nfTwvZGl2PjwvdGQ+PC90cj5gfTwvdGJvZHk+CiAgICAgICAgICAgICR7cm93cy5sZW5ndGg/YDx0Zm9vdD48dHIgc3R5bGU9ImZvbnQtd2VpZ2h0OjkwMDtiYWNrZ3JvdW5kOnZhcigtLWNyZWFtKTsiPjx0ZCBjb2xzcGFuPSIzIj5UT1RBTCR7bmVlZGxlPycgKEZJTFRFUkVEKSc6Jyd9PC90ZD48dGQgY2xhc3M9Im51bSI+JHttb25leSh0b3RhbE5ldCl9PC90ZD48dGQgY2xhc3M9Im51bSI+JHttb25leSh0b3RhbENvc3QpfTwvdGQ+PHRkIGNsYXNzPSJudW0iPiR7bW9uZXkoc2hvd25Qcm9maXQpfTwvdGQ+PHRkIGNsYXNzPSJudW0iPiR7dG90YWxOZXQ+MD8oc2hvd25Qcm9maXQvdG90YWxOZXQqMTAwKS50b0ZpeGVkKDEpKyclJzonMC4wJSd9PC90ZD48dGQgY2xhc3M9Im51bSI+JHttb25leSh0b3RhbFBhaWQpfTwvdGQ+PHRkIGNsYXNzPSJudW0iPiR7bW9uZXkodG90YWxCYWxhbmNlKX08L3RkPjwvdHI+PC90Zm9vdD5gOicnfQogICAgICAgICAgPC90YWJsZT4KICAgICAgICA8L2Rpdj5gOwogICAgICBncmlkLmluc2VydEFkamFjZW50RWxlbWVudCgnYWZ0ZXJlbmQnLGNhcmQpOwogICAgfWNhdGNoKGVycil7CiAgICAgIGNvbnNvbGUuZXJyb3IoJ0Vjb0h1YiBTYWxlcyBOZXQgUHJvZml0IGVuaGFuY2VtZW50IGZhaWxlZDonLGVycik7CiAgICB9CiAgfQoKICBFLnJlbmRlclNhbGVzPWZ1bmN0aW9uKGNvbnRhaW5lcil7CiAgICBjb25zdCByZXN1bHQ9b3JpZ2luYWwoY29udGFpbmVyKTsKICAgIHNldFRpbWVvdXQoKCk9PmVuaGFuY2UoY29udGFpbmVyKSwwKTsKICAgIGlmKGNvbnRhaW5lciAmJiAhY29udGFpbmVyLl9fc2FsZXNQcm9maXRPYnNlcnZlcil7CiAgICAgIGxldCB0aW1lcj0wOwogICAgICBjb25zdCBvYnNlcnZlcj1uZXcgTXV0YXRpb25PYnNlcnZlcigoKT0+ewogICAgICAgIGNsZWFyVGltZW91dCh0aW1lcik7CiAgICAgICAgdGltZXI9c2V0VGltZW91dCgoKT0+ZW5oYW5jZShjb250YWluZXIpLDIwKTsKICAgICAgfSk7CiAgICAgIG9ic2VydmVyLm9ic2VydmUoY29udGFpbmVyLHtjaGlsZExpc3Q6dHJ1ZSxzdWJ0cmVlOnRydWV9KTsKICAgICAgY29udGFpbmVyLl9fc2FsZXNQcm9maXRPYnNlcnZlcj1vYnNlcnZlcjsKICAgIH0KICAgIHJldHVybiByZXN1bHQ7CiAgfTsKfSkoKTsK');
-    html=html.replace('</body>','<script>'+salesProfitHotfix+'<\/script></body>');
+
+    async function addon(path){
+      try{
+        const r=await fetch(path,{cache:'no-store'});
+        if(!r.ok) throw new Error(`${path} (${r.status})`);
+        return await r.text();
+      }catch(err){
+        console.error('EcoHub add-on skipped:',err);
+        return '';
+      }
+    }
+    const [salesProfit,dashboardDrilldown]=await Promise.all([
+      addon('assets/sales-net-profit-safe-v2.js'),
+      addon('assets/dashboard-drilldown-v1.js')
+    ]);
+    const extras=[salesProfit,dashboardDrilldown].filter(Boolean).map(js=>'<script>'+js+'<\\/script>').join('');
+    if(extras) html=html.replace('</body>',extras+'</body>');
+
     document.open();document.write(html);document.close();
-  }catch(err){console.error(err);box.innerHTML=`<b>EcoHub failed to load.</b><br><small>${String(err.message||err)}</small>`;}
+  }catch(err){
+    console.error(err);
+    box.innerHTML=`<b>EcoHub failed to load.</b><br><small>${String(err.message||err)}</small>`;
+  }
 })();
 </script>
 </body>
