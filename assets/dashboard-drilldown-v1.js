@@ -25,48 +25,43 @@
     catch(_e){return {grand:0,amountPaid:0,remainingBalance:0,status:'—'};}
   }
   function recognized(q){
-    try{return E.isRevenueRecognized?E.isRevenueRecognized(q):!!q&&q.orderStatus==='Completed';}
-    catch(_e){return !!q&&q.orderStatus==='Completed';}
+    try{return E.isRevenueRecognized?E.isRevenueRecognized(q):q&&q.orderStatus==='Completed';}
+    catch(_e){return q&&q.orderStatus==='Completed';}
   }
   function confirmed(q){
-    try{return E.isConfirmed?E.isConfirmed(q):!!q&&q.quotationStatus==='Approved';}
-    catch(_e){return !!q&&q.quotationStatus==='Approved';}
+    try{return E.isConfirmedQuotation?E.isConfirmedQuotation(q):!cancelled(q);}
+    catch(_e){return !cancelled(q);}
   }
 
   function closeModal(){
-    const old=document.getElementById('ecohub-kpi-drilldown-modal');
+    const old=document.getElementById('ecohub-dashboard-drill-modal');
     if(old) old.remove();
   }
-
   function openQuotation(number){
     closeModal();
     try{
       E.navigate('quotations');
       setTimeout(()=>{
-        const main=document.getElementById('main-content');
-        if(main && typeof E.openQuotationEditor==='function') E.openQuotationEditor(main,number);
-      },30);
-    }catch(err){console.error('EcoHub drilldown open quotation failed',err);}
+        const c=document.getElementById('main-content');
+        if(c && E.openQuotationEditor) E.openQuotationEditor(c,number);
+      },0);
+    }catch(err){console.error('Open quotation from dashboard drilldown failed',err);}
   }
-
-  function modalShell(title,subtitle,totalLabel,totalValue,tableHtml){
+  function modalShell(title,sub,totalLabel,totalValue,body){
     closeModal();
     const overlay=document.createElement('div');
-    overlay.id='ecohub-kpi-drilldown-modal';
-    overlay.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(17,35,25,.48);display:flex;align-items:flex-start;justify-content:center;padding:5vh 14px;overflow:auto;';
-    overlay.innerHTML=`
-      <div role="dialog" aria-modal="true" style="width:min(1180px,100%);background:#fff;border:1px solid var(--line,#DCD3C2);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.22);overflow:hidden;">
-        <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:16px 18px;border-bottom:1px solid var(--line,#DCD3C2);background:#FAF8F3;">
-          <div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#9C7A54;font-weight:800;">Dashboard Drill-down</div><h3 style="margin:4px 0 3px;font-size:19px;">${esc(title)}</h3><div style="font-size:12px;color:#617064;">${esc(subtitle)}</div></div>
-          <button id="ecohub-kpi-close" class="btn small" style="min-width:44px;">✕</button>
-        </div>
-        <div style="padding:14px 18px 4px;">
-          <div class="kpi" style="display:inline-block;min-width:220px;margin-bottom:12px;"><div class="lbl">${esc(totalLabel)}</div><div class="val">${money(totalValue)}</div></div>
-          ${tableHtml}
-        </div>
-      </div>`;
+    overlay.id='ecohub-dashboard-drill-modal';
+    overlay.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(20,34,25,.48);display:flex;align-items:flex-start;justify-content:center;padding:5vh 14px 24px;overflow:auto;';
+    overlay.innerHTML=`<div style="width:min(1180px,100%);background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.25);overflow:hidden;">
+      <div style="padding:16px 18px;border-bottom:1px solid var(--line,#ddd);display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+        <div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft,#68766c);">Dashboard Breakdown</div><h3 style="margin:3px 0 2px;">${esc(title)}</h3><div style="font-size:12px;color:var(--ink-soft,#68766c);">${esc(sub||'')}</div></div>
+        <button class="btn" id="ecohub-dashboard-drill-close" style="min-width:44px;">Close</button>
+      </div>
+      <div style="padding:14px 18px 8px;"><div class="kpi" style="display:inline-block;min-width:220px;"><div class="lbl">${esc(totalLabel)}</div><div class="val">${money(totalValue)}</div></div></div>
+      <div style="padding:0 18px 18px;">${body}</div>
+    </div>`;
     document.body.appendChild(overlay);
-    const closeBtn=overlay.querySelector('#ecohub-kpi-close');
+    const closeBtn=overlay.querySelector('#ecohub-dashboard-drill-close');
     if(closeBtn) closeBtn.addEventListener('click',closeModal);
     overlay.addEventListener('click',e=>{if(e.target===overlay)closeModal();});
     overlay.querySelectorAll('[data-drill-open-q]').forEach(btn=>btn.addEventListener('click',()=>openQuotation(btn.dataset.drillOpenQ)));
@@ -175,6 +170,17 @@
     setTimeout(()=>enhance(container),0);
     return result;
   };
+
+  // The dashboard may already be rendered before this add-on loads.
+  // Enhance the existing view immediately so KPI cards work on first load.
+  setTimeout(()=>{
+    try{
+      const current=document.getElementById('main-content');
+      if(current) enhance(current);
+    }catch(err){
+      console.error('EcoHub dashboard initial drilldown attach failed',err);
+    }
+  },0);
 
   document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 })();
