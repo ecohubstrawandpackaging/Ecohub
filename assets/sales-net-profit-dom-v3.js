@@ -22,13 +22,20 @@
         try{return E.isRevenueRecognized ? E.isRevenueRecognized(q) : q && q.orderStatus==='Completed';}
         catch(_e){return q && q.orderStatus==='Completed';}
       }).map(q=>{
-        let t={net:0,cogs:0,grossProfit:0};
+        const stored=(q&&q.profitSummary&&typeof q.profitSummary==='object')?q.profitSummary:{};
+        let t={
+          net:Number(stored.netSales)||0,
+          cogs:Number(stored.cogs)||0,
+          grossProfit:Number(stored.grossProfit)||0
+        };
         let p={amountPaid:0,remainingBalance:0};
-        try{ if(E.quotationTotals) t=E.quotationTotals(q)||t; }catch(_e){}
+        try{ if(E.quotationTotals) t=Object.assign({},t,E.quotationTotals(q)||{}); }catch(_e){}
         try{ if(E.quotationPaymentInfo) p=E.quotationPaymentInfo(q)||p; }catch(_e){}
-        const net=Number(t.net)||0;
-        const cost=Number(t.cogs)||0;
-        const profit=Number(t.grossProfit)||Math.max(0,net-cost);
+        const net=Number(t.net)||Number(stored.netSales)||0;
+        const cost=Number(t.cogs)||Number(stored.cogs)||0;
+        const profit=Number.isFinite(Number(t.grossProfit)) && Number(t.grossProfit)!==0
+          ? Number(t.grossProfit)
+          : (Number.isFinite(Number(stored.grossProfit)) ? Number(stored.grossProfit) : (net-cost));
         return {
           q,
           date:q.completedDate||q.date||'',
