@@ -33,13 +33,13 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
     let html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
 
     try{
-      const r=await fetch('assets/sales-net-profit-dom-v3.js?v=407d24ed',{cache:'no-store'});
+      const r=await fetch('assets/sales-records-fix-v4.js?v=d530e45d',{cache:'no-store'});
       if(r.ok){
-        const salesProfit=await r.text();
-        if(salesProfit) html=html.replace('</body>','<script>'+salesProfit+'<\\/script></body>');
+        const salesFix=await r.text();
+        if(salesFix) html=html.replace('</body>','<script>'+salesFix+'<\\/script></body>');
       }
     }catch(addonErr){
-      console.error('EcoHub Sales Records add-on skipped:',addonErr);
+      console.error('EcoHub Sales Records fix skipped:',addonErr);
     }
 
     document.open();document.write(html);document.close();
