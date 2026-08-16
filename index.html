@@ -32,22 +32,15 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
     if(!('DecompressionStream' in window)) throw new Error('Please update Safari/Chrome to open EcoHub.');
     let html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
 
-    async function addon(path){
-      try{
-        const r=await fetch(path,{cache:'no-store'});
-        if(!r.ok) throw new Error(`${path} (${r.status})`);
-        return await r.text();
-      }catch(err){
-        console.error('EcoHub add-on skipped:',err);
-        return '';
+    try{
+      const r=await fetch('assets/sales-net-profit-dom-v3.js?v=20260816-1954',{cache:'no-store'});
+      if(r.ok){
+        const salesProfit=await r.text();
+        if(salesProfit) html=html.replace('</body>','<script>'+salesProfit+'<\\/script></body>');
       }
+    }catch(addonErr){
+      console.error('EcoHub Sales Records add-on skipped:',addonErr);
     }
-    const [salesProfit,dashboardDrilldown]=await Promise.all([
-      addon('assets/sales-net-profit-safe-v2.js?v=20260816-1947'),
-      addon('assets/dashboard-drilldown-v1.js?v=bc73f1bf')
-    ]);
-    const extras=[salesProfit,dashboardDrilldown].filter(Boolean).map(js=>'<script>'+js+'<\\/script>').join('');
-    if(extras) html=html.replace('</body>',extras+'</body>');
 
     document.open();document.write(html);document.close();
   }catch(err){
