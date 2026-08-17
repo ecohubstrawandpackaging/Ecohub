@@ -32,15 +32,22 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
     if(!('DecompressionStream' in window)) throw new Error('Please update Safari/Chrome to open EcoHub.');
     let html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
 
-    try{
-      const r=await fetch('assets/sales-records-fix-v4.js?v=d530e45d',{cache:'no-store'});
-      if(r.ok){
-        const salesFix=await r.text();
-        if(salesFix) html=html.replace('</body>','<script>'+salesFix+'<\\/script></body>');
+    async function addon(path){
+      try{
+        const r=await fetch(path,{cache:'no-store'});
+        if(!r.ok) throw new Error(`${path} (${r.status})`);
+        return await r.text();
+      }catch(err){
+        console.error('EcoHub add-on skipped:',err);
+        return '';
       }
-    }catch(addonErr){
-      console.error('EcoHub Sales Records fix skipped:',addonErr);
     }
+    const [salesFix,printFix]=await Promise.all([
+      addon('assets/sales-records-fix-v4.js?v=d530e45d'),
+      addon('assets/quotation-print-route-v1.js?v=f5568032')
+    ]);
+    const extras=[salesFix,printFix].filter(Boolean).map(js=>'<script>'+js+'<\\/script>').join('');
+    if(extras) html=html.replace('</body>',extras+'</body>');
 
     document.open();document.write(html);document.close();
   }catch(err){
