@@ -15,45 +15,27 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
   const box=document.getElementById('ecohub-loader');
   try{
     const paths=[
-      'assets/ecohub-v5-p01.txt','assets/ecohub-v5-p02.txt',
-      'assets/ecohub-v5-p03a.txt','assets/ecohub-v5-p03b.txt','assets/ecohub-v5-p03c.txt',
+      'assets/ecohub-v5-p01.txt',
+      'assets/ecohub-v5-p02.txt',
+      'assets/ecohub-v5-p03a.txt',
+      'assets/ecohub-v5-p03b.txt',
+      'assets/ecohub-v5-p03c.txt',
       'assets/ecohub-v5-p04.txt',
-      'assets/ecohub-v5-p05a.txt','assets/ecohub-v5-p05b.txt','assets/ecohub-v5-p05c.txt',
-      'assets/ecohub-v5-p06.txt','assets/ecohub-v5-p07.txt','assets/ecohub-v5-p08.txt'
+      'assets/ecohub-v5-p05a.txt',
+      'assets/ecohub-v5-p05b.txt',
+      'assets/ecohub-v5-p05c.txt',
+      'assets/ecohub-v5-p06.txt',
+      'assets/ecohub-v5-p07.txt',
+      'assets/ecohub-v5-p08.txt'
     ];
-    const texts=await Promise.all(paths.map(async p=>{
-      const r=await fetch(p,{cache:'no-store'});
-      if(!r.ok) throw new Error(`Missing app file: ${p} (${r.status})`);
-      return (await r.text()).trim();
-    }));
+    const texts=await Promise.all(paths.map(async p=>{const r=await fetch(p,{cache:'no-store'});if(!r.ok)throw new Error(`Missing app file: ${p} (${r.status})`);return(await r.text()).trim();}));
     const binary=atob(texts.join(''));
     const bytes=new Uint8Array(binary.length);
-    for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
-    if(!('DecompressionStream' in window)) throw new Error('Please update Safari/Chrome to open EcoHub.');
-    let html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
-
-    async function addon(path){
-      try{
-        const r=await fetch(path,{cache:'no-store'});
-        if(!r.ok) throw new Error(`${path} (${r.status})`);
-        return await r.text();
-      }catch(err){
-        console.error('EcoHub add-on skipped:',err);
-        return '';
-      }
-    }
-    const [salesFix,printFix]=await Promise.all([
-      addon('assets/sales-records-fix-v4.js?v=d530e45d'),
-      addon('assets/quotation-print-route-v1.js?v=8c080553')
-    ]);
-    const extras=[salesFix,printFix].filter(Boolean).map(js=>'<script>'+js+'<\\/script>').join('');
-    if(extras) html=html.replace('</body>',extras+'</body>');
-
+    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+    if(!('DecompressionStream' in window))throw new Error('Please update Safari/Chrome to open EcoHub.');
+    const html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
     document.open();document.write(html);document.close();
-  }catch(err){
-    console.error(err);
-    box.innerHTML=`<b>EcoHub failed to load.</b><br><small>${String(err.message||err)}</small>`;
-  }
+  }catch(err){console.error(err);box.innerHTML=`<b>EcoHub failed to load.</b><br><small>${String(err.message||err)}</small>`;}
 })();
 </script>
 </body>
