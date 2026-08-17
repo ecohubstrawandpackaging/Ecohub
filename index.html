@@ -44,7 +44,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
     }
     const [salesFix,printFix]=await Promise.all([
       addon('assets/sales-records-fix-v4.js?v=d530e45d'),
-      addon('assets/quotation-print-route-v1.js?v=f5568032')
+      addon('assets/quotation-print-route-v1.js?v=8c080553')
     ]);
     const extras=[salesFix,printFix].filter(Boolean).map(js=>'<script>'+js+'<\\/script>').join('');
     if(extras) html=html.replace('</body>',extras+'</body>');
