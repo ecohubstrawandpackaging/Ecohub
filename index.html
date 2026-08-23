@@ -33,7 +33,22 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
     let html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
 
     const coreFix=`<script>(function(){'use strict';
+      function ensureMobileShortcuts(){
+        if(document.getElementById('ecohub-mobile-shortcuts')) return;
+        const style=document.createElement('style');
+        style.id='ecohub-mobile-shortcuts-style';
+        style.textContent='@media(min-width:901px){#ecohub-mobile-shortcuts{display:none!important}}#ecohub-mobile-shortcuts{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:2147483000;display:flex;flex-direction:column;gap:8px;align-items:flex-end}#ecohub-mobile-shortcuts button{border:1px solid rgba(255,255,255,.28);background:#173b2b;color:#fff;border-radius:999px;padding:11px 14px;min-height:44px;font:700 12px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.24);white-space:nowrap}';
+        document.head.appendChild(style);
+        const wrap=document.createElement('div');
+        wrap.id='ecohub-mobile-shortcuts';
+        wrap.innerHTML='<button type="button" id="ecohub-mobile-client-production">🧭 Client &amp; Production</button><button type="button" id="ecohub-mobile-restock">📉 Restock</button>';
+        document.body.appendChild(wrap);
+        document.getElementById('ecohub-mobile-client-production').addEventListener('click',()=>{window.location.href='client-production-control.html';});
+        document.getElementById('ecohub-mobile-restock').addEventListener('click',()=>{window.location.href='restock-dashboard.html';});
+      }
+
       function applyFixes(){
+        ensureMobileShortcuts();
         const E=window.__ecohub;
         if(!E) return;
 
@@ -95,6 +110,9 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
       }
       applyFixes();
       document.addEventListener('DOMContentLoaded',applyFixes,{once:true});
+      setTimeout(applyFixes,500);
+      setTimeout(applyFixes,1500);
+      setTimeout(applyFixes,3000);
     })();<\/script>`;
     html=html.replace('</body>',coreFix+'</body>');
 
