@@ -38,11 +38,9 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
         if(!E) return;
 
         // Sales Records core bug fix: the existing Sales module references global \"state\".
-        // Point that identifier at the canonical EcoHub state instead of replacing the Sales renderer.
         window.state=E.state;
 
         // Business rule: quotation inventory is physically deducted ONLY when Order Status is Completed.
-        // The original sync still handles supplier-payable planning and also releases any prior deduction first.
         if(!window.__ecohubCompletedOnlyInventoryV1 && E.syncPayablesForQuotation && E.applyInventoryDeduction){
           window.__ecohubCompletedOnlyInventoryV1=true;
           const originalSync=E.syncPayablesForQuotation;
@@ -52,7 +50,6 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
             E.applyInventoryDeduction=function(){ return 0; };
             try{
               const result=await originalSync(q);
-              // Keep planning display coherent while retaining zero physical deduction bookkeeping.
               if(q && Array.isArray(q.items)) q.items.forEach(it=>{
                 const qty=Number(it.qty)||0, purchase=Number(it._qtyToPurchase)||0;
                 it._qtyFromInventory=Math.max(0,qty-purchase);
@@ -66,7 +63,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
           };
         }
 
-        // Make Restock Intelligence visible from the main EcoHub sidebar.
+        // Restock Intelligence in main sidebar.
         if(!document.getElementById('restock-intelligence-nav')){
           const inventoryBtn=document.querySelector('.nav-item[data-view="inventory"]');
           if(inventoryBtn){
@@ -77,6 +74,22 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
             btn.innerHTML='<span class="nav-icon">📉</span><span class="nav-label">Restock Intelligence</span>';
             btn.addEventListener('click',()=>{ window.location.href='restock-dashboard.html'; });
             inventoryBtn.insertAdjacentElement('afterend',btn);
+          }
+        }
+
+        // Client + Production Control Center in main sidebar.
+        if(!document.getElementById('client-production-control-nav')){
+          const restockBtn=document.getElementById('restock-intelligence-nav');
+          const inventoryBtn=document.querySelector('.nav-item[data-view="inventory"]');
+          const anchor=restockBtn||inventoryBtn;
+          if(anchor){
+            const btn=document.createElement('button');
+            btn.id='client-production-control-nav';
+            btn.className='nav-item';
+            btn.type='button';
+            btn.innerHTML='<span class="nav-icon">🧭</span><span class="nav-label">Client &amp; Production</span>';
+            btn.addEventListener('click',()=>{ window.location.href='client-production-control.html'; });
+            anchor.insertAdjacentElement('afterend',btn);
           }
         }
       }
