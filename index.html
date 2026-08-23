@@ -15,27 +15,81 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
   const box=document.getElementById('ecohub-loader');
   try{
     const paths=[
-      'assets/ecohub-v5-p01.txt',
-      'assets/ecohub-v5-p02.txt',
-      'assets/ecohub-v5-p03a.txt',
-      'assets/ecohub-v5-p03b.txt',
-      'assets/ecohub-v5-p03c.txt',
+      'assets/ecohub-v5-p01.txt','assets/ecohub-v5-p02.txt',
+      'assets/ecohub-v5-p03a.txt','assets/ecohub-v5-p03b.txt','assets/ecohub-v5-p03c.txt',
       'assets/ecohub-v5-p04.txt',
-      'assets/ecohub-v5-p05a.txt',
-      'assets/ecohub-v5-p05b.txt',
-      'assets/ecohub-v5-p05c.txt',
-      'assets/ecohub-v5-p06.txt',
-      'assets/ecohub-v5-p07.txt',
-      'assets/ecohub-v5-p08.txt'
+      'assets/ecohub-v5-p05a.txt','assets/ecohub-v5-p05b.txt','assets/ecohub-v5-p05c.txt',
+      'assets/ecohub-v5-p06.txt','assets/ecohub-v5-p07.txt','assets/ecohub-v5-p08.txt'
     ];
-    const texts=await Promise.all(paths.map(async p=>{const r=await fetch(p,{cache:'no-store'});if(!r.ok)throw new Error(`Missing app file: ${p} (${r.status})`);return(await r.text()).trim();}));
+    const texts=await Promise.all(paths.map(async p=>{
+      const r=await fetch(p,{cache:'no-store'});
+      if(!r.ok) throw new Error(`Missing app file: ${p} (${r.status})`);
+      return (await r.text()).trim();
+    }));
     const binary=atob(texts.join(''));
     const bytes=new Uint8Array(binary.length);
-    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-    if(!('DecompressionStream' in window))throw new Error('Please update Safari/Chrome to open EcoHub.');
-    const html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    if(!('DecompressionStream' in window)) throw new Error('Please update Safari/Chrome to open EcoHub.');
+    let html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+
+    const coreFix=`<script>(function(){'use strict';
+      function applyFixes(){
+        const E=window.__ecohub;
+        if(!E) return;
+
+        // Sales Records core bug fix: the existing Sales module references global \"state\".
+        // Point that identifier at the canonical EcoHub state instead of replacing the Sales renderer.
+        window.state=E.state;
+
+        // Business rule: quotation inventory is physically deducted ONLY when Order Status is Completed.
+        // The original sync still handles supplier-payable planning and also releases any prior deduction first.
+        if(!window.__ecohubCompletedOnlyInventoryV1 && E.syncPayablesForQuotation && E.applyInventoryDeduction){
+          window.__ecohubCompletedOnlyInventoryV1=true;
+          const originalSync=E.syncPayablesForQuotation;
+          E.syncPayablesForQuotation=async function(q){
+            if(q && q.orderStatus==='Completed') return originalSync(q);
+            const originalApply=E.applyInventoryDeduction;
+            E.applyInventoryDeduction=function(){ return 0; };
+            try{
+              const result=await originalSync(q);
+              // Keep planning display coherent while retaining zero physical deduction bookkeeping.
+              if(q && Array.isArray(q.items)) q.items.forEach(it=>{
+                const qty=Number(it.qty)||0, purchase=Number(it._qtyToPurchase)||0;
+                it._qtyFromInventory=Math.max(0,qty-purchase);
+                it._deductedQty=0;
+                it._deductedCode='';
+              });
+              return result;
+            } finally {
+              E.applyInventoryDeduction=originalApply;
+            }
+          };
+        }
+
+        // Make Restock Intelligence visible from the main EcoHub sidebar.
+        if(!document.getElementById('restock-intelligence-nav')){
+          const inventoryBtn=document.querySelector('.nav-item[data-view="inventory"]');
+          if(inventoryBtn){
+            const btn=document.createElement('button');
+            btn.id='restock-intelligence-nav';
+            btn.className='nav-item';
+            btn.type='button';
+            btn.innerHTML='<span class="nav-icon">📉</span><span class="nav-label">Restock Intelligence</span>';
+            btn.addEventListener('click',()=>{ window.location.href='restock-dashboard.html'; });
+            inventoryBtn.insertAdjacentElement('afterend',btn);
+          }
+        }
+      }
+      applyFixes();
+      document.addEventListener('DOMContentLoaded',applyFixes,{once:true});
+    })();<\/script>`;
+    html=html.replace('</body>',coreFix+'</body>');
+
     document.open();document.write(html);document.close();
-  }catch(err){console.error(err);box.innerHTML=`<b>EcoHub failed to load.</b><br><small>${String(err.message||err)}</small>`;}
+  }catch(err){
+    console.error(err);
+    box.innerHTML=`<b>EcoHub failed to load.</b><br><small>${String(err.message||err)}</small>`;
+  }
 })();
 </script>
 </body>
