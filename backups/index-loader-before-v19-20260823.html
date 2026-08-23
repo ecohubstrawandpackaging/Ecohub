@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>EcoHub Business System</title>
+<style>
+html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f3ea;color:#1f3d2b}body{min-height:100vh;display:grid;place-items:center}#ecohub-loader{padding:24px;text-align:center;max-width:560px}.spin{width:30px;height:30px;border:3px solid #d8dfd2;border-top-color:#1f3d2b;border-radius:50%;margin:0 auto 14px;animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}small{color:#5b6f61}
+</style>
+</head>
+<body>
+<div id="ecohub-loader"><div class="spin"></div><b>Loading EcoHub…</b><br><small>Connecting to the business system.</small></div>
+<script>
+(async()=>{
+  const box=document.getElementById('ecohub-loader');
+  try{
+    const paths=[
+      'assets/ecohub-v5-p01.txt',
+      'assets/ecohub-v5-p02.txt',
+      'assets/ecohub-v5-p03a.txt',
+      'assets/ecohub-v5-p03b.txt',
+      'assets/ecohub-v5-p03c.txt',
+      'assets/ecohub-v5-p04.txt',
+      'assets/ecohub-v5-p05a.txt',
+      'assets/ecohub-v5-p05b.txt',
+      'assets/ecohub-v5-p05c.txt',
+      'assets/ecohub-v5-p06.txt',
+      'assets/ecohub-v5-p07.txt',
+      'assets/ecohub-v5-p08.txt'
+    ];
+    const texts=await Promise.all(paths.map(async p=>{const r=await fetch(p,{cache:'no-store'});if(!r.ok)throw new Error(`Missing app file: ${p} (${r.status})`);return(await r.text()).trim();}));
+    const binary=atob(texts.join(''));
+    const bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+    if(!('DecompressionStream' in window))throw new Error('Please update Safari/Chrome to open EcoHub.');
+    const html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    document.open();document.write(html);document.close();
+  }catch(err){console.error(err);box.innerHTML=`<b>EcoHub failed to load.</b><br><small>${String(err.message||err)}</small>`;}
+})();
+</script>
+</body>
+</html>
