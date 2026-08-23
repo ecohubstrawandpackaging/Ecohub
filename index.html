@@ -12,6 +12,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
 <div id="ecohub-loader"><div class="spin"></div><b>Loading EcoHub…</b><br><small>Connecting to the business system.</small></div>
 <script>
 (async()=>{
+  const BUILD='20260824-0220';
   const box=document.getElementById('ecohub-loader');
   try{
     const paths=[
@@ -22,7 +23,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
       'assets/ecohub-v5-p06.txt','assets/ecohub-v5-p07.txt','assets/ecohub-v5-p08.txt'
     ];
     const texts=await Promise.all(paths.map(async p=>{
-      const r=await fetch(p,{cache:'no-store'});
+      const r=await fetch(p+'?v='+BUILD,{cache:'no-store'});
       if(!r.ok) throw new Error(`Missing app file: ${p} (${r.status})`);
       return (await r.text()).trim();
     }));
@@ -33,94 +34,86 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
     let html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
 
     const coreFix=`<script>(function(){'use strict';
-      function ensureMobileShortcuts(){
-        if(document.getElementById('ecohub-mobile-shortcuts')) return;
-        const style=document.createElement('style');
-        style.id='ecohub-mobile-shortcuts-style';
-        style.textContent='@media(min-width:901px){#ecohub-mobile-shortcuts{display:none!important}}#ecohub-mobile-shortcuts{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:2147483000;display:flex;flex-direction:column;gap:8px;align-items:flex-end}#ecohub-mobile-shortcuts button{border:1px solid rgba(255,255,255,.28);background:#173b2b;color:#fff;border-radius:999px;padding:11px 14px;min-height:44px;font:700 12px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.24);white-space:nowrap}';
-        document.head.appendChild(style);
-        const wrap=document.createElement('div');
-        wrap.id='ecohub-mobile-shortcuts';
-        wrap.innerHTML='<button type="button" id="ecohub-mobile-client-production">🧭 Client &amp; Production</button><button type="button" id="ecohub-mobile-restock">📉 Restock</button>';
-        document.body.appendChild(wrap);
-        document.getElementById('ecohub-mobile-client-production').addEventListener('click',()=>{window.location.href='client-production-control.html';});
-        document.getElementById('ecohub-mobile-restock').addEventListener('click',()=>{window.location.href='restock-dashboard.html';});
-      }
-
+      const BUILD='${BUILD}';
+      function money(v){return '₱'+(Number(v)||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});}
+      function esc(v){return String(v==null?'':v).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));}
       function applyFixes(){
-        ensureMobileShortcuts();
         const E=window.__ecohub;
-        if(!E) return;
-
-        // Sales Records core bug fix: the existing Sales module references global \"state\".
+        if(!E) return false;
         window.state=E.state;
 
-        // Business rule: quotation inventory is physically deducted ONLY when Order Status is Completed.
-        if(!window.__ecohubCompletedOnlyInventoryV1 && E.syncPayablesForQuotation && E.applyInventoryDeduction){
-          window.__ecohubCompletedOnlyInventoryV1=true;
+        if(!window.__ecohubCompletedOnlyInventoryV2 && E.syncPayablesForQuotation && E.applyInventoryDeduction){
+          window.__ecohubCompletedOnlyInventoryV2=true;
           const originalSync=E.syncPayablesForQuotation;
           E.syncPayablesForQuotation=async function(q){
             if(q && q.orderStatus==='Completed') return originalSync(q);
             const originalApply=E.applyInventoryDeduction;
-            E.applyInventoryDeduction=function(){ return 0; };
+            E.applyInventoryDeduction=function(){return 0;};
             try{
               const result=await originalSync(q);
-              if(q && Array.isArray(q.items)) q.items.forEach(it=>{
-                const qty=Number(it.qty)||0, purchase=Number(it._qtyToPurchase)||0;
-                it._qtyFromInventory=Math.max(0,qty-purchase);
-                it._deductedQty=0;
-                it._deductedCode='';
-              });
+              if(q && Array.isArray(q.items)) q.items.forEach(it=>{it._deductedQty=0;it._deductedCode='';});
               return result;
-            } finally {
-              E.applyInventoryDeduction=originalApply;
-            }
+            } finally { E.applyInventoryDeduction=originalApply; }
           };
         }
 
-        // Restock Intelligence in main sidebar.
-        if(!document.getElementById('restock-intelligence-nav')){
-          const inventoryBtn=document.querySelector('.nav-item[data-view="inventory"]');
-          if(inventoryBtn){
-            const btn=document.createElement('button');
-            btn.id='restock-intelligence-nav';
-            btn.className='nav-item';
-            btn.type='button';
-            btn.innerHTML='<span class="nav-icon">📉</span><span class="nav-label">Restock Intelligence</span>';
-            btn.addEventListener('click',()=>{ window.location.href='restock-dashboard.html'; });
-            inventoryBtn.insertAdjacentElement('afterend',btn);
-          }
+        if(!window.__ecohubSalesRecordsV21){
+          window.__ecohubSalesRecordsV21=true;
+          let salesMonth=(E.todayISO?E.todayISO():new Date().toISOString().slice(0,10)).slice(0,7);
+          let salesSearch='';
+          E.renderSales=function(container){
+            try{
+              const all=(E.state.quotations||[]).filter(q=>q && q.orderStatus==='Completed').map(q=>{
+                const t=E.quotationTotals(q), p=E.quotationPaymentInfo(q);
+                const date=q.completedDate||q.date||'';
+                const client=String(q.company||q.customer||'Unassigned Client').trim()||'Unassigned Client';
+                return {q,t,p,date,client,margin:t.net>0?(t.grossProfit/t.net)*100:0};
+              }).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+              const monthRows=salesMonth?all.filter(x=>String(x.date).slice(0,7)===salesMonth):all;
+              const needle=salesSearch.trim().toLowerCase();
+              const rows=needle?monthRows.filter(x=>x.client.toLowerCase().includes(needle)||String(x.q.number||'').toLowerCase().includes(needle)):monthRows;
+              const sum=monthRows.reduce((a,x)=>{a.sales+=Number(x.t.net)||0;a.paid+=Number(x.p.amountPaid)||0;a.balance+=Number(x.p.remainingBalance)||0;a.cost+=Number(x.t.cogs)||0;a.profit+=Number(x.t.grossProfit)||0;a.count++;return a;},{sales:0,paid:0,balance:0,cost:0,profit:0,count:0});
+              const period=salesMonth?new Date(salesMonth+'-01T00:00:00').toLocaleDateString('en-PH',{month:'long',year:'numeric'}):'All Time';
+              container.innerHTML='<div class="topbar"><div class="titleblock"><p class="eyebrow">Sales</p><h2>Sales Records — '+esc(period)+'</h2></div><div class="actions" style="gap:7px;flex-wrap:wrap"><input id="sales-search-v21" value="'+esc(salesSearch)+'" placeholder="Search client or quotation…" style="min-width:220px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff"><input id="sales-month-v21" type="month" value="'+esc(salesMonth)+'" style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff"><button class="btn small" id="sales-all-v21">All Time</button></div></div>'+
+                '<p style="color:var(--ink-soft);font-size:12.5px;margin-top:-10px">One row = one Completed quotation. Completed but unpaid orders stay in Sales Records; payment and receivable are separate.</p>'+
+                '<div class="kpi-grid"><div class="kpi"><div class="lbl">Completed Transactions</div><div class="val">'+sum.count.toLocaleString()+'</div></div><div class="kpi"><div class="lbl">Net Sales</div><div class="val">'+money(sum.sales)+'</div></div><div class="kpi"><div class="lbl">Total Paid</div><div class="val">'+money(sum.paid)+'</div></div><div class="kpi"><div class="lbl">Receivable</div><div class="val">'+money(sum.balance)+'</div></div><div class="kpi"><div class="lbl">COGS / Direct Cost</div><div class="val">'+money(sum.cost)+'</div></div><div class="kpi"><div class="lbl">Net Profit</div><div class="val">'+money(sum.profit)+'</div></div></div>'+
+                '<div class="card"><div class="table-wrap"><table class="data"><thead><tr><th>Completed</th><th>Quotation</th><th>Client</th><th class="num">Net Sales</th><th class="num">Paid</th><th class="num">Balance</th><th class="num">COGS</th><th class="num">Net Profit</th><th class="num">Margin</th><th>Payment</th><th></th></tr></thead><tbody>'+
+                (rows.length?rows.map((x,i)=>'<tr><td>'+esc(x.date||'—')+'</td><td><b>'+esc(x.q.number||'—')+'</b></td><td><b>'+esc(x.client)+'</b></td><td class="num">'+money(x.t.net)+'</td><td class="num">'+money(x.p.amountPaid)+'</td><td class="num">'+money(x.p.remainingBalance)+'</td><td class="num">'+money(x.t.cogs)+'</td><td class="num" style="font-weight:800">'+money(x.t.grossProfit)+'</td><td class="num">'+x.margin.toFixed(1)+'%</td><td>'+esc(x.p.status||'Unpaid')+'</td><td><button class="btn small" data-sales-detail-v21="'+i+'">Details</button></td></tr><tr data-sales-row-v21="'+i+'" style="display:none;background:var(--sage-light)"><td colspan="11" style="padding:12px 16px">'+
+                  '<div style="margin-bottom:8px"><b>'+esc(x.q.number)+' — '+esc(x.client)+'</b><div style="font-size:11px;color:var(--ink-soft)">Grand Total '+money(x.t.grand)+' · Paid '+money(x.p.amountPaid)+' · Balance '+money(x.p.remainingBalance)+'</div></div><table class="data" style="font-size:12px"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Net Sale</th><th class="num">Cost</th><th class="num">Profit</th></tr></thead><tbody>'+((x.q.items||[]).map(it=>{const qty=Number(it.qty)||0,net=Math.max(0,qty*(Number(it.price)||0)-(Number(it.discount)||0)),cost=qty*(Number(it.cost)||0);return '<tr><td>'+esc(it.name||it.description||'—')+'</td><td class="num">'+qty.toLocaleString()+'</td><td class="num">'+money(net)+'</td><td class="num">'+money(cost)+'</td><td class="num">'+money(net-cost)+'</td></tr>';}).join('')||'<tr><td colspan="5">No items.</td></tr>')+'</tbody></table></td></tr>').join(''):'<tr><td colspan="11"><div class="empty-state">No completed transactions for this period.</div></td></tr>')+
+                '</tbody></table></div></div>';
+              const s=container.querySelector('#sales-search-v21'); if(s)s.addEventListener('input',e=>{salesSearch=e.target.value;E.renderSales(container);const n=container.querySelector('#sales-search-v21');if(n){n.focus();try{n.setSelectionRange(n.value.length,n.value.length);}catch(_){}}});
+              const m=container.querySelector('#sales-month-v21'); if(m)m.addEventListener('change',e=>{salesMonth=e.target.value||'';E.renderSales(container);});
+              const a=container.querySelector('#sales-all-v21'); if(a)a.addEventListener('click',()=>{salesMonth='';E.renderSales(container);});
+              container.querySelectorAll('[data-sales-detail-v21]').forEach(btn=>btn.addEventListener('click',()=>{const row=container.querySelector('[data-sales-row-v21="'+btn.dataset.salesDetailV21+'"]');if(!row)return;const open=row.style.display==='none';row.style.display=open?'table-row':'none';btn.textContent=open?'Close':'Details';}));
+            }catch(err){console.error('Sales Records v21 failed',err);container.innerHTML='<div class="card"><div class="empty-state"><b>Sales Records could not load.</b><br>'+esc(err.message||err)+'</div></div>';}
+          };
         }
 
-        // Client + Production Control Center in main sidebar.
-        if(!document.getElementById('client-production-control-nav')){
-          const restockBtn=document.getElementById('restock-intelligence-nav');
-          const inventoryBtn=document.querySelector('.nav-item[data-view="inventory"]');
-          const anchor=restockBtn||inventoryBtn;
-          if(anchor){
-            const btn=document.createElement('button');
-            btn.id='client-production-control-nav';
-            btn.className='nav-item';
-            btn.type='button';
-            btn.innerHTML='<span class="nav-icon">🧭</span><span class="nav-label">Client &amp; Production</span>';
-            btn.addEventListener('click',()=>{ window.location.href='client-production-control.html'; });
-            anchor.insertAdjacentElement('afterend',btn);
-          }
+        function addNav(id,label,icon,url,after){
+          if(document.getElementById(id))return;
+          const anchor=document.querySelector(after); if(!anchor)return;
+          const btn=document.createElement('button');btn.id=id;btn.className='nav-item';btn.type='button';btn.innerHTML='<span class="nav-icon">'+icon+'</span><span class="nav-label">'+label+'</span>';
+          btn.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();window.location.href=url;},true);
+          anchor.insertAdjacentElement('afterend',btn);
         }
+        addNav('restock-intelligence-nav','Restock Intelligence','📉','restock-dashboard.html','.nav-item[data-view="inventory"]');
+        addNav('client-production-control-nav','Client & Production','🧭','client-production-control.html','#restock-intelligence-nav');
+
+        if(!document.getElementById('ecohub-mobile-tools')){
+          const wrap=document.createElement('div');wrap.id='ecohub-mobile-tools';wrap.style.cssText='position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:flex-end;font-family:system-ui,-apple-system,sans-serif';
+          wrap.innerHTML='<button id="ecohub-clientprod-float" style="border:0;border-radius:999px;padding:11px 14px;background:#173b2b;color:white;font-weight:800;box-shadow:0 6px 22px #0003">🧭 Client & Production</button><button id="ecohub-restock-float" style="border:1px solid #173b2b;border-radius:999px;padding:10px 13px;background:white;color:#173b2b;font-weight:800;box-shadow:0 6px 22px #0002">📉 Restock</button>';
+          document.body.appendChild(wrap);
+          wrap.querySelector('#ecohub-clientprod-float').onclick=()=>window.location.href='client-production-control.html';
+          wrap.querySelector('#ecohub-restock-float').onclick=()=>window.location.href='restock-dashboard.html';
+        }
+        document.documentElement.dataset.ecohubBuild=BUILD;
+        return true;
       }
-      applyFixes();
-      document.addEventListener('DOMContentLoaded',applyFixes,{once:true});
-      setTimeout(applyFixes,500);
-      setTimeout(applyFixes,1500);
-      setTimeout(applyFixes,3000);
+      let tries=0;function retry(){tries++;if(applyFixes())return;if(tries<40)setTimeout(retry,150);}retry();
     })();<\/script>`;
     html=html.replace('</body>',coreFix+'</body>');
-
     document.open();document.write(html);document.close();
-  }catch(err){
-    console.error(err);
-    box.innerHTML=`<b>EcoHub failed to load.</b><br><small>${String(err.message||err)}</small>`;
-  }
+  }catch(err){console.error(err);box.innerHTML=`<b>EcoHub failed to load.</b><br><small>${String(err.message||err)}</small>`;}
 })();
 </script>
 </body>
