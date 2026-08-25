@@ -12,7 +12,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
 <div id="ecohub-loader"><div class="spin"></div><b>Loading EcoHub…</b><br><small>Connecting to the business system.</small></div>
 <script>
 (async()=>{
-  const BUILD='20260824-0245';
+  const BUILD='20260826-0130';
   const box=document.getElementById('ecohub-loader');
   try{
     const paths=[
@@ -42,6 +42,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
         if(!E) return false;
         window.state=E.state;
 
+        // Inventory rule: physical inventory deduction ONLY on Completed orders.
         if(!window.__ecohubCompletedOnlyInventoryV2 && E.syncPayablesForQuotation && E.applyInventoryDeduction){
           window.__ecohubCompletedOnlyInventoryV2=true;
           const originalSync=E.syncPayablesForQuotation;
@@ -54,6 +55,46 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
               if(q && Array.isArray(q.items)) q.items.forEach(it=>{it._deductedQty=0;it._deductedCode='';});
               return result;
             } finally { E.applyInventoryDeduction=originalApply; }
+          };
+        }
+
+        // Stable Sales Records: one Completed quotation = one transaction.
+        // Supplier Portal V2: keep supplier production jobs synced whenever a quotation save runs.
+        if(!window.__ecohubSupplierJobAutoSyncV1 && E.syncPayablesForQuotation && E.supabaseClient){
+          window.__ecohubSupplierJobAutoSyncV1=true;
+          const syncBeforeSupplierPortal=E.syncPayablesForQuotation;
+          E.syncPayablesForQuotation=async function(q){
+            const result=await syncBeforeSupplierPortal(q);
+            try{
+              const hasPrinted=(q&&Array.isArray(q.items))?q.items.some(it=>{
+                const code=it&&it.code;
+                const p=(E.state.products||[]).find(x=>x.code===code);
+                return p&&p.category==='Printed Cups';
+              }):false;
+              if(hasPrinted){
+                E.supabaseClient.rpc('ecohub_sync_supplier_jobs',{p_supplier_code:'ECOCYCLE'}).then(({error})=>{if(error)console.error('Supplier job auto-sync failed',error);});
+              }
+            }catch(err){console.error('Supplier job auto-sync failed',err);}
+            return result;
+          };
+        }
+
+        // Supplier Portal V2: refresh payables from Supabase each time Supplier Payables is opened,
+        // so supplier-submitted quotations appear without re-encoding or a full app reload.
+        if(!window.__ecohubLivePayablesV1 && E.renderPayables && E.storageListKeys && E.storageGet){
+          window.__ecohubLivePayablesV1=true;
+          const originalRenderPayables=E.renderPayables;
+          E.renderPayables=function(container){
+            container.innerHTML='<div class="card"><div class="empty-state">Refreshing Supplier Payables…</div></div>';
+            (async()=>{
+              try{
+                const keys=await E.storageListKeys('payable:');
+                const fresh=[];
+                for(const k of keys){const v=await E.storageGet(k);if(v)fresh.push(v);}
+                E.state.payables=fresh;
+              }catch(err){console.error('Live Supplier Payables refresh failed',err);}
+              originalRenderPayables(container);
+            })();
           };
         }
 
@@ -92,7 +133,9 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
         }
         addNav('restock-intelligence-nav','Restock Intelligence','📉','restock-dashboard.html','.nav-item[data-view="inventory"]');
         addNav('client-production-control-nav','Client & Production','🧭','client-production-control.html','#restock-intelligence-nav');
+        addNav('supplier-control-center-nav','Supplier Control Center','🏭','supplier-control-center.html','.nav-item[data-view="payables"]');
 
+        // Always-visible mobile/iPad shortcuts.
         if(!document.getElementById('ecohub-mobile-tools')){
           const wrap=document.createElement('div');wrap.id='ecohub-mobile-tools';wrap.style.cssText='position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:flex-end;font-family:system-ui,-apple-system,sans-serif';
           wrap.innerHTML='<button id="ecohub-clientprod-float" style="border:0;border-radius:999px;padding:11px 14px;background:#173b2b;color:white;font-weight:800;box-shadow:0 6px 22px #0003">🧭 Client & Production</button><button id="ecohub-restock-float" style="border:1px solid #173b2b;border-radius:999px;padding:10px 13px;background:white;color:#173b2b;font-weight:800;box-shadow:0 6px 22px #0002">📉 Restock</button>';
@@ -105,7 +148,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
       }
       let tries=0;function retry(){tries++;if(applyFixes())return;if(tries<40)setTimeout(retry,150);}retry();
     })();<\/script>`;
-    html += coreFix;
+    html += coreFix + '<script src="assets/quotation-client-cupstock-v1.js?v='+BUILD+'"><\/script>';
     document.open();document.write(html);document.close();
   }catch(err){console.error(err);box.innerHTML=`<b>EcoHub failed to load.</b><br><small>${String(err.message||err)}</small>`;}
 })();
