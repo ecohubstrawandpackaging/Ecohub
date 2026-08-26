@@ -29,3 +29,11 @@ function logic(){if(window.__ecohubQuotationCupStockV2||!E.syncPayablesForQuotat
 function boot(){E=window.__ecohub;if(!E){setTimeout(boot,150);return}logic();schedule();const root=document.getElementById('main-content')||document.body,newNodes=m=>[...m.addedNodes].some(x=>x.nodeType===1&&(x.matches?.('#q-items-body,tr[data-id],tr[data-alloc-for]')||x.querySelector?.('#q-items-body,tr[data-id],tr[data-alloc-for]')));new MutationObserver(ms=>{if(ms.some(newNodes))schedule()}).observe(root,{childList:true,subtree:true});document.addEventListener('input',e=>{if(['f-company','f-customer'].includes(e.target?.id))schedule()});document.addEventListener('change',e=>{if(e.target?.id==='f-client-id'||e.target?.classList?.contains('c-product')||e.target?.classList?.contains('c-category'))schedule()})}
 boot();
 })();
+;(function(){
+  if(document.querySelector('script[data-client-acquisition-v1]'))return;
+  const s=document.createElement('script');
+  s.src='assets/client-acquisition-v1.js?v=20260826-1514';
+  s.dataset.clientAcquisitionV1='1';
+  s.async=false;
+  document.head.appendChild(s);
+})();
