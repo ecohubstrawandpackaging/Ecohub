@@ -218,3 +218,12 @@
   }
   boot();
 })();
+
+(function(){
+  if(document.querySelector('script[data-ecohub-finance-aug16]')) return;
+  const s=document.createElement('script');
+  s.dataset.ecohubFinanceAug16='1';
+  s.src='assets/finance-reset-aug16-v1.js?v=20260826-1005';
+  s.onerror=()=>console.error('Finance Aug 16 fix failed to load');
+  document.head.appendChild(s);
+})();
