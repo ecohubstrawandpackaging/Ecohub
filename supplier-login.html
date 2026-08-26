@@ -14,18 +14,10 @@
 (function(){
   const msg=document.getElementById('msg'), retry=document.getElementById('retry');
   function clearSupplierSession(){
-    try{
-      const targets=[];
-      for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('sb-fyvogvjvivxpqztbaoct-'))targets.push(k)}
-      targets.forEach(k=>localStorage.removeItem(k));
-    }catch(_){}
-    try{
-      const targets=[];
-      for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(k&&k.startsWith('sb-fyvogvjvivxpqztbaoct-'))targets.push(k)}
-      targets.forEach(k=>sessionStorage.removeItem(k));
-    }catch(_){}
+    try{const targets=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('sb-fyvogvjvivxpqztbaoct-'))targets.push(k)}targets.forEach(k=>localStorage.removeItem(k));}catch(_){}
+    try{const targets=[];for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(k&&k.startsWith('sb-fyvogvjvivxpqztbaoct-'))targets.push(k)}targets.forEach(k=>sessionStorage.removeItem(k));}catch(_){}
   }
-  function go(){clearSupplierSession();location.replace('supplier-portal-v5.html?fresh=1&v=20260826-2335')}
+  function go(){clearSupplierSession();location.replace('supplier.html?fresh=1&v=20260826-ecohub-only')}
   retry.onclick=go;
   try{go()}catch(e){msg.textContent='Could not reset the old session automatically. Tap the button below.';retry.hidden=false}
 })();
