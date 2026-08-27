@@ -9,15 +9,15 @@
 </style>
 </head>
 <body>
-<div class="card"><div class="logo">EcoHub Supplier Portal</div><div id="msg" class="sub">Opening a fresh supplier session. Your EcoHub admin login will stay signed in.</div><button id="retry" class="btn" hidden>Open Supplier Login</button></div>
+<div class="card"><div class="logo">EcoHub Supplier Portal</div><div id="msg" class="sub">Opening a clean supplier login…</div><button id="retry" class="btn" hidden>Open Supplier Login</button></div>
 <script>
 (function(){
   const msg=document.getElementById('msg'),retry=document.getElementById('retry');
-  function clearSupplierOnly(){
-    try{localStorage.removeItem('ecohub-supplier-auth-v1');}catch(_){}
-    try{sessionStorage.removeItem('ecohub-supplier-auth-v1');}catch(_){}
+  function clearCurrentSupabaseSession(){
+    try{const keys=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('sb-fyvogvjvivxpqztbaoct-'))keys.push(k)}keys.forEach(k=>localStorage.removeItem(k));}catch(_){}
+    try{const keys=[];for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(k&&k.startsWith('sb-fyvogvjvivxpqztbaoct-'))keys.push(k)}keys.forEach(k=>sessionStorage.removeItem(k));}catch(_){}
   }
-  function go(){clearSupplierOnly();location.replace('supplier-portal-isolated.html?fresh=1&v=20260827');}
+  function go(){clearCurrentSupabaseSession();location.replace('supplier-portal-v5.html?fresh=1&v=20260827-stable');}
   retry.onclick=go;
   try{go()}catch(e){msg.textContent='Could not open the supplier login automatically. Tap below.';retry.hidden=false;}
 })();
