@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>EcoHub Supplier Account Manager</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.79.0/dist/umd/supabase.js"></script>
+<style>
+:root{--bg:#f4f1e8;--card:#fff;--ink:#173b2b;--muted:#6f7c73;--line:#ddd6c8;--green:#176b49;--red:#a63d35}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{max-width:720px;margin:7vh auto;padding:16px}.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 12px 35px rgba(23,59,43,.07)}h1{margin:0 0 4px;font-size:24px}.sub{color:var(--muted);font-size:12px;line-height:1.5}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}label{font-size:11px;color:var(--muted)}input,select,.btn{font:inherit;border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fff;color:var(--ink)}input,select{width:100%;margin-top:5px}.wide{grid-column:1/-1}.btn{font-weight:800;cursor:pointer}.btn.dark{background:var(--ink);color:#fff;border-color:var(--ink)}.btn:disabled{opacity:.55;cursor:not-allowed}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.msg{margin-top:14px;padding:11px;border-radius:10px;background:#f8f6f0;color:var(--muted);display:none}.msg.good{display:block;background:#e6f3eb;color:var(--green)}.msg.bad{display:block;background:#f8dedb;color:var(--red)}.notice{margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:11px;background:#faf8f3;color:var(--muted);font-size:12px;line-height:1.5}@media(max-width:650px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.wrap{margin:2vh auto}}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+<h1>Create Supplier Account</h1>
+<div class="sub" id="who">Checking EcoHub admin session…</div>
+<div id="form" class="hidden">
+<div class="grid">
+<label>Supplier Email<input id="email" type="email" placeholder="supplier@email.com"></label>
+<label>Temporary Password<input id="password" type="text" minlength="8" placeholder="At least 8 characters"></label>
+<label>Supplier<select id="supplier"><option value="ECOCYCLE">Ecocycle (ECOCYCLE)</option></select></label>
+<label>Action<select id="mode" disabled><option>Create new or reset existing account</option></select></label>
+</div>
+<div class="notice"><b>No signup email needed.</b> EcoHub creates or resets the account directly, confirms the email automatically, and assigns it to the selected supplier. If the email already exists, the password is reset instead of creating a duplicate account.</div>
+<div class="actions"><button id="create" class="btn dark">Create / Reset Supplier Account</button><button id="control" class="btn">Back to Control Center</button><button id="portal" class="btn">Open Supplier Portal</button></div>
+<div id="msg" class="msg"></div>
+</div>
+<div id="denied" class="notice" style="display:none"><b>Internal admin access required.</b><br><span id="deniedText"></span><div class="actions"><button id="signin" class="btn dark">Sign in to Control Center</button></div></div>
+</div></div>
+<script>
+const URL='https://fyvogvjvivxpqztbaoct.supabase.co',KEY='sb_publishable_gnvNDN1co5qB7tBBevXziQ_pbAoBc87';
+const sb=supabase.createClient(URL,KEY);const $=s=>document.querySelector(s);
+async function boot(){
+ const {data:{session}}=await sb.auth.getSession();
+ if(!session){$('#who').textContent='No EcoHub admin session found.';$('#denied').style.display='block';$('#deniedText').textContent='Open the Supplier Control Center and sign in first.';return;}
+ $('#who').textContent='Signed in as '+(session.user.email||session.user.id)+' · checking admin access…';
+ const {data:staff,error}=await sb.from('ecohub_internal_users').select('user_id').eq('user_id',session.user.id).maybeSingle();
+ if(error||!staff){$('#denied').style.display='block';$('#deniedText').textContent='This account is not authorized as an EcoHub internal admin.';return;}
+ $('#who').textContent='Admin: '+(session.user.email||session.user.id);$('#form').classList.remove('hidden');
+}
+$('#create').onclick=async()=>{
+ const email=$('#email').value.trim(),password=$('#password').value,supplier_code=$('#supplier').value,msg=$('#msg'),btn=$('#create');
+ msg.className='msg';msg.textContent='';if(!email||!email.includes('@')){msg.className='msg bad';msg.textContent='Enter a valid supplier email.';return}if(password.length<8){msg.className='msg bad';msg.textContent='Password must be at least 8 characters.';return}
+ btn.disabled=true;btn.textContent='Creating account…';
+ try{const {data,error}=await sb.functions.invoke('ecohub-create-supplier-account',{body:{email,password,supplier_code}});if(error)throw error;if(data?.error)throw new Error(data.error);msg.className='msg good';msg.innerHTML='<b>'+String(data?.message||'Supplier account ready.')+'</b><br>Email: '+email+'<br>Supplier: '+String(data?.supplier?.name||supplier_code)+'<br><br>You can now give this email and temporary password to the supplier.';}
+ catch(e){msg.className='msg bad';msg.textContent='Could not create supplier account: '+(e?.message||e)}finally{btn.disabled=false;btn.textContent='Create / Reset Supplier Account'}
+};
+$('#control').onclick=()=>location.href='supplier-control-center.html';$('#portal').onclick=()=>location.href='supplier-login.html';$('#signin').onclick=()=>location.href='supplier-control-center.html';boot();
+</script>
+</body></html>
