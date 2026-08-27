@@ -12,11 +12,11 @@
 (async()=>{
   const box=document.getElementById('box');
   try{
-    const r=await fetch('supplier-portal-v5.html?v=20260827-isolated',{cache:'no-store'});
+    const r=await fetch('supplier-portal-v5.html?v=20260827-isolated-fix',{cache:'no-store'});
     if(!r.ok) throw new Error('Supplier Portal file could not be loaded.');
     let html=await r.text();
-    const marker='<script src="assets/supplier-portal-v5.js?v=20260826-1241"><\\/script>';
-    const shim='<script>(function(){if(!window.supabase||window.__ecohubSupplierAuthIsolated)return;window.__ecohubSupplierAuthIsolated=true;const base=window.supabase.createClient.bind(window.supabase);window.supabase.createClient=function(url,key,opts){opts=opts||{};opts.auth=Object.assign({},opts.auth||{},{storageKey:"ecohub-supplier-auth-v1",persistSession:true,autoRefreshToken:true,detectSessionInUrl:true});return base(url,key,opts);};})();<\\/script>';
+    const marker='<script src="assets/supplier-portal-v5.js?v=20260826-1241"></scr'+'ipt>';
+    const shim='<script>(function(){if(!window.supabase||window.__ecohubSupplierAuthIsolated)return;window.__ecohubSupplierAuthIsolated=true;const base=window.supabase.createClient.bind(window.supabase);window.supabase.createClient=function(url,key,opts){opts=opts||{};opts.auth=Object.assign({},opts.auth||{},{storageKey:"ecohub-supplier-auth-v1",persistSession:true,autoRefreshToken:true,detectSessionInUrl:true});return base(url,key,opts);};})();</scr'+'ipt>';
     if(!html.includes(marker)) throw new Error('Supplier Portal entry point was not found.');
     html=html.replace(marker,shim+marker);
     document.open();document.write(html);document.close();
