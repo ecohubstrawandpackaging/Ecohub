@@ -136,3 +136,13 @@
   }
   boot();
 })();
+
+;(function(){
+  if(document.querySelector('script[data-finance-reset-v2]'))return;
+  const s=document.createElement('script');
+  s.src='assets/finance-reset-aug16-v2.js?v=20260828-1701';
+  s.dataset.financeResetV2='1';
+  s.async=false;
+  s.onerror=()=>console.error('Finance Reset V2 failed to load');
+  document.head.appendChild(s);
+})();
