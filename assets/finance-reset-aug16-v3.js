@@ -6,6 +6,7 @@ function boot(){
   if(!E){if(++tries<120)setTimeout(boot,120);return;}
   if(window.__financeAug16FixV3)return;
   window.__financeAug16FixV3=1;
+  window.__financeAug16FixV2=1;
 
   const S=E.state,N=v=>Number(v)||0,esc=v=>E.escapeHtml?E.escapeHtml(v):String(v==null?'':v);
   const RD=()=>String(S.settings?.financeResetDate||'2026-08-16');
