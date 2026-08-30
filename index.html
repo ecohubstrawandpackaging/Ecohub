@@ -12,7 +12,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
 <div id="ecohub-loader"><div class="spin"></div><b>Loading EcoHub…</b><br><small>Connecting to the business system.</small></div>
 <script>
 (async()=>{
-  const BUILD='20260830-archive-aug1-15';
+  const BUILD='20260830-supplier-split-v1';
   const box=document.getElementById('ecohub-loader');
   try{
     const paths=[
@@ -72,7 +72,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
                 return p&&p.category==='Printed Cups';
               }):false;
               if(hasPrinted){
-                E.supabaseClient.rpc('ecohub_sync_supplier_jobs',{p_supplier_code:'ECOCYCLE'}).then(({error})=>{if(error)console.error('Supplier job auto-sync failed',error);});
+                E.supabaseClient.rpc('ecohub_sync_supplier_jobs',{p_supplier_code:'PRINTING'}).then(({error})=>{if(error)console.error('Printing supplier job auto-sync failed',error);});
               }
             }catch(err){console.error('Supplier job auto-sync failed',err);}
             return result;
@@ -148,7 +148,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
       }
       let tries=0;function retry(){tries++;if(applyFixes())return;if(tries<40)setTimeout(retry,150);}retry();
     })();<\/script>`;
-    html += coreFix + '<script src="assets/finance-ledger-actions-v1.js?v='+BUILD+'"><\/script>' + '<script src="assets/quotation-client-cupstock-v1.js?v='+BUILD+'"><\/script>' + '<script src="assets/finance-history-aug1-15-v1.js?v='+BUILD+'"><\/script>';
+    html += coreFix + '<script src="assets/finance-ledger-actions-v1.js?v='+BUILD+'"><\/script>' + '<script src="assets/quotation-client-cupstock-v1.js?v='+BUILD+'"><\/script>' + '<script src="assets/quotation-print-specs-v1.js?v='+BUILD+'"><\/script>' + '<script src="assets/finance-history-aug1-15-v1.js?v='+BUILD+'"><\/script>';
     document.open();document.write(html);document.close();
   }catch(err){console.error(err);box.innerHTML=`<b>EcoHub failed to load.</b><br><small>${String(err.message||err)}</small>`;}
 })();
