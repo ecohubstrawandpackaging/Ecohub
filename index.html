@@ -12,7 +12,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
 <div id="ecohub-loader"><div class="spin"></div><b>Loading EcoHub…</b><br><small>Connecting to the business system.</small></div>
 <script>
 (async()=>{
-  const BUILD='20260901-production-tracker-v1';
+  const BUILD='20260901-profit-distribution-v1';
   const box=document.getElementById('ecohub-loader');
   try{
     const paths=[
@@ -134,12 +134,14 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
         addNav('restock-intelligence-nav','Restock Intelligence','📉','restock-dashboard.html','.nav-item[data-view="inventory"]');
         addNav('client-production-control-nav','Client & Production','🧭','client-production-control.html','#restock-intelligence-nav');
         addNav('supplier-control-center-nav','Supplier Control Center','🏭','supplier-control-center.html','.nav-item[data-view="payables"]');
+        addNav('profit-distribution-nav','Profit Distribution','📊','profit-distribution.html','.nav-item[data-view="sales"]');
 
         // Always-visible mobile/iPad shortcuts.
         if(!document.getElementById('ecohub-mobile-tools')){
           const wrap=document.createElement('div');wrap.id='ecohub-mobile-tools';wrap.style.cssText='position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:flex-end;font-family:system-ui,-apple-system,sans-serif';
-          wrap.innerHTML='<button id="ecohub-clientprod-float" style="border:0;border-radius:999px;padding:11px 14px;background:#173b2b;color:white;font-weight:800;box-shadow:0 6px 22px #0003">🧭 Client & Production</button><button id="ecohub-restock-float" style="border:1px solid #173b2b;border-radius:999px;padding:10px 13px;background:white;color:#173b2b;font-weight:800;box-shadow:0 6px 22px #0002">📉 Restock</button>';
+          wrap.innerHTML='<button id="ecohub-profitdist-float" style="border:0;border-radius:999px;padding:11px 14px;background:#173b2b;color:white;font-weight:800;box-shadow:0 6px 22px #0003">📊 Profit Distribution</button><button id="ecohub-clientprod-float" style="border:1px solid #173b2b;border-radius:999px;padding:10px 13px;background:white;color:#173b2b;font-weight:800;box-shadow:0 6px 22px #0002">🧭 Client & Production</button><button id="ecohub-restock-float" style="border:1px solid #173b2b;border-radius:999px;padding:10px 13px;background:white;color:#173b2b;font-weight:800;box-shadow:0 6px 22px #0002">📉 Restock</button>';
           document.body.appendChild(wrap);
+          wrap.querySelector('#ecohub-profitdist-float').onclick=()=>window.location.href='profit-distribution.html';
           wrap.querySelector('#ecohub-clientprod-float').onclick=()=>window.location.href='client-production-control.html';
           wrap.querySelector('#ecohub-restock-float').onclick=()=>window.location.href='restock-dashboard.html';
         }
