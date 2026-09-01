@@ -15,11 +15,11 @@ html,body{margin:0;width:100%;height:100%;background:#f5f1e8;color:#173b2b;font:
  const stage=document.getElementById('stage'),msg=document.getElementById('msg'),retry=document.getElementById('retry');
  retry.onclick=()=>location.reload();
  try{
-   const r=await fetch('supplier-portal-v7.html?source=20260830-supplier-split-v1',{cache:'no-store'});
+   const r=await fetch('supplier-portal-v7.html?source=20260901-production-tracker-v1',{cache:'no-store'});
    if(!r.ok) throw new Error('Portal layout could not be loaded ('+r.status+').');
    let html=await r.text();
-   const oldTag='<script src="assets/supplier-portal-v5.js?v=20260830-supplier-split-v1"></'+'script>';
-   const newTag='<script src="assets/supplier-portal-runtime-v8.js?v=20260830-supplier-split-v1"></'+'script>';
+   const oldTag='<script src="assets/supplier-portal-v5.js?v=20260901-production-tracker-v1"></'+'script>';
+   const newTag='<script src="assets/supplier-portal-runtime-v8.js?v=20260901-production-tracker-v1"></'+'script>';
    if(!html.includes(oldTag)) throw new Error('Portal application entry point was not found.');
    html=html.replace(oldTag,newTag);
    const frame=document.createElement('iframe');
