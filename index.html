@@ -12,7 +12,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
 <div id="ecohub-loader"><div class="spin"></div><b>Loading EcoHub…</b><br><small>Connecting to the business system.</small></div>
 <script>
 (async()=>{
-  const BUILD='20260902-split-supplier-payables-v1';
+  const BUILD='20260902-profit-supplier-workflow-v2';
   const box=document.getElementById('ecohub-loader');
   try{
     const paths=[
@@ -59,25 +59,8 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
         }
 
         // Stable Sales Records: one Completed quotation = one transaction.
-        // Supplier Portal V2: keep supplier production jobs synced whenever a quotation save runs.
-        if(!window.__ecohubSupplierJobAutoSyncV1 && E.syncPayablesForQuotation && E.supabaseClient){
-          window.__ecohubSupplierJobAutoSyncV1=true;
-          const syncBeforeSupplierPortal=E.syncPayablesForQuotation;
-          E.syncPayablesForQuotation=async function(q){
-            const result=await syncBeforeSupplierPortal(q);
-            try{
-              const hasPrinted=(q&&Array.isArray(q.items))?q.items.some(it=>{
-                const code=it&&it.code;
-                const p=(E.state.products||[]).find(x=>x.code===code);
-                return p&&p.category==='Printed Cups';
-              }):false;
-              if(hasPrinted){
-                E.supabaseClient.rpc('ecohub_sync_supplier_jobs',{p_supplier_code:'PRINTING'}).then(({error})=>{if(error)console.error('Printing supplier job auto-sync failed',error);});
-              }
-            }catch(err){console.error('Supplier job auto-sync failed',err);}
-            return result;
-          };
-        }
+        // Client quotations stay inside EcoHub. Supplier portals create their own supplier
+        // quotations and production jobs to avoid duplicate or unconfirmed supplier orders.
 
         // Supplier Portal V2: refresh payables from Supabase each time Supplier Payables is opened,
         // so supplier-submitted quotations appear without re-encoding or a full app reload.
@@ -150,7 +133,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
       }
       let tries=0;function retry(){tries++;if(applyFixes())return;if(tries<40)setTimeout(retry,150);}retry();
     })();<\/script>`;
-    html += coreFix + '<script src="assets/finance-ledger-actions-v1.js?v='+BUILD+'"><\/script>' + '<script src="assets/quotation-client-cupstock-v1.js?v='+BUILD+'"><\/script>' + '<script src="assets/quotation-print-specs-v1.js?v='+BUILD+'"><\/script>' + '<script src="assets/finance-history-aug1-15-v1.js?v='+BUILD+'"><\/script>' + '<script src="assets/supplier-payables-split-v1.js?v='+BUILD+'"><\/script>';
+    html += coreFix + '<script src="assets/finance-ledger-actions-v1.js?v='+BUILD+'"><\/script>' + '<script src="assets/quotation-client-cupstock-v1.js?v='+BUILD+'"><\/script>' + '<script src="assets/quotation-print-specs-v2.js?v='+BUILD+'"><\/script>' + '<script src="assets/finance-history-aug1-15-v1.js?v='+BUILD+'"><\/script>' + '<script src="assets/supplier-payables-split-v1.js?v='+BUILD+'"><\/script>';
     document.open();document.write(html);document.close();
   }catch(err){console.error(err);box.innerHTML=`<b>EcoHub failed to load.</b><br><small>${String(err.message||err)}</small>`;}
 })();
