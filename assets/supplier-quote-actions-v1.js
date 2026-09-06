@@ -1,0 +1,6 @@
+(function(){
+'use strict';
+const $=s=>document.querySelector(s),ctx=()=>window.SupplierPortalContext;
+function install(){const c=ctx();if(!c?.profile||c.profile.code!=='ECOCYCLE')return;for(const q of(c.quotes||[])){if(!['Draft','Submitted'].includes(q.status))continue;const open=$(`[data-q="${q.id}"]`),cell=open?.parentElement;if(!cell)continue;if(!cell.querySelector(`[data-supplier-edit="${q.id}"]`)){const b=document.createElement('button');b.className='btn tiny';b.dataset.supplierEdit=q.id;b.textContent='Edit';b.style.marginLeft='5px';b.onclick=e=>{e.stopPropagation();open.click();setTimeout(()=>$('#detailEdit')?.click(),0)};cell.appendChild(b)}if(!cell.querySelector(`[data-supplier-delete="${q.id}"]`)){const b=document.createElement('button');b.className='btn tiny red';b.dataset.supplierDelete=q.id;b.textContent='Delete';b.style.marginLeft='5px';b.onclick=async e=>{e.stopPropagation();if(!confirm(`Delete / void quotation ${q.supplier_quote_no||''}? Its projected payable lines will also be cancelled.`))return;b.disabled=true;const r=await c.rpc('supplier_void_quote',{p_quote_id:q.id});if(r.error){b.disabled=false;return alert(r.error.message)}await c.reload()};cell.appendChild(b)}}}
+window.addEventListener('supplier-portal-data',install);const timer=setInterval(()=>{if(ctx()?.profile){clearInterval(timer);install()}},50);
+})();

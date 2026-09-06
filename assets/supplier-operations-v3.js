@@ -37,8 +37,8 @@ function configure(){
   if(!isOperations())return;
   const kendrick=profile().code==='KENDRICK';
   $('#supplierSubtitle').textContent=kendrick?'Natural straw quotations, receivables, EcoHub stock and pending orders.':'Packaging quotations, receivables, EcoHub stock, special pricing and pending orders.';
-  if(kendrick){$$('.nav button[data-stage],.nav button[data-view="clients"],.nav button[data-view="production"]').forEach(x=>x.classList.add('hidden'));$('#addCustom').classList.add('hidden')}
-  $('#addCatalog').textContent='+ Catalog Product';if(!kendrick)$('#addCustom').textContent='+ Custom Product';
+  if(kendrick){$$('.nav button[data-stage],.nav button[data-view="clients"],.nav button[data-view="production"]').forEach(x=>x.classList.add('hidden'));$('#addCustom').classList.remove('hidden')}
+  $('#addCatalog').textContent='+ Catalog Product';$('#addCustom').textContent=kendrick?'+ Custom Item':'+ Custom Product';
   const sub=$('#quoteModal .dialog>.sub');if(sub)sub.textContent='Quotation recipient is fixed to EcoHub Straw and Packaging. Use Client Name as an optional order reference.';
   const note=$('#quoteModal .notice');if(note)note.innerHTML='<b>Stock handling:</b> Existing EcoHub Stock deducts supplier-held stock upon fulfillment. Supplier to Fulfill tracks the remaining delivery. Quotation Only creates no pending fulfillment.';
   configured=true;enhanceQuoteLines();render();
@@ -71,7 +71,7 @@ function wireQuoteEnhancement(){
   };
   ['newQuote','newQuote2'].forEach(id=>$('#'+id)?.addEventListener('click',()=>setTimeout(()=>{if(isOperations()&&!$('#qClient').value)$('#qClient').value='EcoHub Stock Order';if(profile()?.code==='KENDRICK'&&$('#qNo').value.startsWith('ECO-'))$('#qNo').value='KEN-'+$('#qNo').value.slice(4);enhanceQuoteLines()},0)));
 }
-function enhanceQuoteLines(){if(!isOperations())return;const edit=context().editQuote;$$('#quoteLines .quote-line').forEach((row,i)=>{if(row.querySelector('.fulfillment'))return;const seed=edit?.items?.[i]?.fulfillment_source||'Supplier to Fulfill',label=document.createElement('label');label.className='stock-source';label.innerHTML=`Stock Handling<select class="fulfillment"><option ${seed==='Supplier to Fulfill'?'selected':''}>Supplier to Fulfill</option><option ${seed==='Use Existing EcoHub Stock'?'selected':''}>Use Existing EcoHub Stock</option><option ${seed==='Quotation Only'?'selected':''}>Quotation Only</option></select>`;row.querySelector('.quote-options')?.appendChild(label)})}
+function enhanceQuoteLines(){if(!isOperations())return;const edit=context().editQuote,kendrick=profile()?.code==='KENDRICK';$$('#quoteLines .quote-line').forEach((row,i)=>{if(kendrick&&row.dataset.mode==='custom'){const cat=row.querySelector('.cat option'),input=row.querySelector('.custom');if(cat)cat.textContent='Custom Item';if(input)input.placeholder='Enter another straw or supplier product'}if(row.querySelector('.fulfillment'))return;const seed=edit?.items?.[i]?.fulfillment_source||'Supplier to Fulfill',label=document.createElement('label');label.className='stock-source';label.innerHTML=`Stock Handling<select class="fulfillment"><option ${seed==='Supplier to Fulfill'?'selected':''}>Supplier to Fulfill</option><option ${seed==='Use Existing EcoHub Stock'?'selected':''}>Use Existing EcoHub Stock</option><option ${seed==='Quotation Only'?'selected':''}>Quotation Only</option></select>`;row.querySelector('.quote-options')?.appendChild(label)})}
 
 window.addEventListener('supplier-portal-data',()=>{configure();render()});
 let started=false;function start(){if(started)return;started=true;install();if(profile()){configure();render()}else{const timer=setInterval(()=>{if(profile()){configure();render();clearInterval(timer)}},100)}}
