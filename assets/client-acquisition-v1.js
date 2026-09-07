@@ -3,27 +3,26 @@
   let E=null;
   let scheduled=false;
   const norm=v=>String(v||'').trim().toLowerCase().replace(/\s+/g,' ');
-  const PO_STATUSES=new Set(['waiting for down payment','for production','ongoing production','on production','for quality check','quality check','ready for release','ready','delivered','completed']);
   const iso=v=>String(v||'').slice(0,10);
   const n=v=>Number(v)||0;
 
-  function hasPO(q){
+  function paidPayments(q){
+    return (Array.isArray(q&&q.payments)?q.payments:[]).filter(p=>n(p&&p.amount)>0);
+  }
+
+  function hasPayment(q){
     if(!q)return false;
     const quotationStatus=norm(q.quotationStatus),orderStatus=norm(q.orderStatus);
     if(['cancelled','declined'].includes(quotationStatus)||orderStatus==='cancelled')return false;
-    if(q.poNumber||q.purchaseOrderNumber||q.poDate||q.purchaseOrderDate||q.poIssuedAt||q.purchaseOrderIssuedAt)return true;
-    if(quotationStatus==='approved'||PO_STATUSES.has(orderStatus))return true;
-    return n(q.paid)>0||(q.payments||[]).some(p=>n(p.amount)>0);
+    return n(q.paid)>0||paidPayments(q).length>0;
   }
 
-  function poDate(q){
-    const explicit=iso(q.poDate||q.purchaseOrderDate||q.poIssuedAt||q.purchaseOrderIssuedAt||q.approvedDate||q.orderConfirmedDate);
-    if(explicit)return explicit;
-    const paymentDates=(q.payments||[]).map(p=>iso(p.date||p.createdAt)).filter(Boolean).sort();
-    return paymentDates[0]||iso(q.date||q.createdAt);
+  function firstPaymentDate(q){
+    const paymentDates=paidPayments(q).map(p=>iso(p.date||p.createdAt)).filter(Boolean).sort();
+    return paymentDates[0]||iso(q.firstPaymentDate||q.paidDate||q.date||q.createdAt);
   }
 
-  function poReference(q){return String(q.poNumber||q.purchaseOrderNumber||q.number||'').trim()}
+  function quotationReference(q){return String(q.number||q.poNumber||q.purchaseOrderNumber||'').trim()}
 
   function infoForClient(c){
     if(!E||!c)return {date:'',number:'',quote:null};
@@ -31,9 +30,9 @@
       if(!q)return false;
       if(q.clientId&&c.id&&q.clientId===c.id)return true;
       try{return E.clientMatchesQuotation?E.clientMatchesQuotation(c,q):false;}catch(_){return false;}
-    }).filter(hasPO).filter(q=>poDate(q)).sort((a,b)=>poDate(a).localeCompare(poDate(b))||poReference(a).localeCompare(poReference(b)));
+    }).filter(hasPayment).filter(q=>firstPaymentDate(q)).sort((a,b)=>firstPaymentDate(a).localeCompare(firstPaymentDate(b))||quotationReference(a).localeCompare(quotationReference(b)));
     const q=related[0]||null;
-    return {date:q?poDate(q):'',number:q?poReference(q):'',quote:q,source:q&&(q.poNumber||q.purchaseOrderNumber)?'Purchase Order':'Approved Order'};
+    return {date:q?firstPaymentDate(q):'',number:q?quotationReference(q):'',quote:q,source:'First Payment'};
   }
 
   function dateObj(s){const d=new Date(iso(s)+'T00:00:00');return Number.isNaN(d.getTime())?null:d}
@@ -57,7 +56,7 @@
     if(container.querySelector('[data-weekly-acquisition]'))return;
     const grid=container.querySelector('.kpi-grid');if(!grid)return;
     const rows=weeklyRows(),section=document.createElement('div');section.className='card';section.dataset.weeklyAcquisition='1';
-    section.innerHTML='<div style="padding:16px 18px 10px"><div style="font-weight:800;font-size:16px">Weekly Customer Acquisition</div><div style="font-size:11px;color:var(--ink-soft);margin-top:3px">A client is counted once, on the week of the first approved PO/order—even if the transaction is still ongoing.</div></div><div class="table-wrap"><table class="data"><thead><tr><th>Week</th><th>Date Range</th><th class="num">New Clients</th><th>Clients / First PO</th></tr></thead><tbody>'+rows.map((r,i)=>'<tr><td><b>'+(i===0?'This Week':'Week '+(i+1))+'</b></td><td>'+escapeText(r.start)+' to '+escapeText(r.end)+'</td><td class="num"><b>'+r.clients.length.toLocaleString()+'</b></td><td>'+(r.clients.length?r.clients.map(x=>'<div><b>'+escapeText(clientName(x.client))+'</b> · '+escapeText(x.acquisition.number||'PO')+' · '+escapeText(x.acquisition.date)+'</div>').join(''):'<span style="color:var(--ink-soft)">No new clients</span>')+'</td></tr>').join('')+'</tbody></table></div>';
+    section.innerHTML='<div style="padding:16px 18px 10px"><div style="font-weight:800;font-size:16px">Weekly Customer Acquisition</div><div style="font-size:11px;color:var(--ink-soft);margin-top:3px">A client is counted once, on the date of the first actual partial or full payment. Unpaid quotations are not counted.</div></div><div class="table-wrap"><table class="data"><thead><tr><th>Week</th><th>Date Range</th><th class="num">New Clients</th><th>Clients / First Paid Quotation</th></tr></thead><tbody>'+rows.map((r,i)=>'<tr><td><b>'+(i===0?'This Week':'Week '+(i+1))+'</b></td><td>'+escapeText(r.start)+' to '+escapeText(r.end)+'</td><td class="num"><b>'+r.clients.length.toLocaleString()+'</b></td><td>'+(r.clients.length?r.clients.map(x=>'<div><b>'+escapeText(clientName(x.client))+'</b> · '+escapeText(x.acquisition.number||'Quotation')+' · '+escapeText(x.acquisition.date)+'</div>').join(''):'<span style="color:var(--ink-soft)">No new clients</span>')+'</td></tr>').join('')+'</tbody></table></div>';
     grid.insertAdjacentElement('afterend',section);
   }
 
@@ -84,7 +83,7 @@
     if(contactIndex<0)return false;
     const th=document.createElement('th');
     th.textContent='Acquired';
-    th.title='Based on the client\'s first approved PO/order date';
+    th.title='Based on the client\'s first partial or full payment date';
     headers[contactIndex].insertAdjacentElement('afterend',th);
 
     for(const tr of table.querySelectorAll('tbody tr')){
@@ -132,7 +131,7 @@
     const quoteCard=document.createElement('div');
     quoteCard.className='kpi';
     quoteCard.dataset.clientAcquisitionDetail='1';
-    quoteCard.innerHTML='<div class="lbl">First PO / Approved Order</div><div class="val" style="font-family:inherit;font-size:17px;">'+escapeText(a.number||'—')+'</div>';
+    quoteCard.innerHTML='<div class="lbl">First Paid Quotation</div><div class="val" style="font-family:inherit;font-size:17px;">'+escapeText(a.number||'—')+'</div>';
     grid.append(dateCard,quoteCard);
     return true;
   }
