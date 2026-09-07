@@ -32,7 +32,7 @@ boot();
 ;(function(){
   if(document.querySelector('script[data-client-acquisition-v1]'))return;
   const s=document.createElement('script');
-  s.src='assets/client-acquisition-v1.js?v=20260826-1514';
+  s.src='assets/client-acquisition-v1.js?v=20260907-weekly-po-v1';
   s.dataset.clientAcquisitionV1='1';
   s.async=false;
   document.head.appendChild(s);
