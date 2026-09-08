@@ -34,7 +34,13 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const money=v=>'₱'+N(v).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
 const DEFAULT_LANCE_LIABILITY={id:'lance_founder_payable',creditor:'Lance',openingAmount:29000,originPeriod:'2026-07',repaymentStartPeriod:'2026-08'};
 let quotes=[],expenses=[],payouts=[],ledger=[],settings={},liability={...DEFAULT_LANCE_LIABILITY},selectedMonth='',model=null;
-const client=q=>String(q.company||q.customer||q.clientName||'Unassigned Client').trim()||'Unassigned Client',salesperson=q=>String(q.salesperson||q.salesPerson||q.agent||'—').trim()||'—',date=q=>String(q.completedDate||q.completedAt||q.date||'').slice(0,10),month=q=>date(q).slice(0,7),done=q=>String(q.orderStatus||'').toLowerCase()==='completed',cancel=q=>['cancelled','declined'].includes(String(q.quotationStatus||'').toLowerCase())||String(q.orderStatus||'').toLowerCase()==='cancelled';
+const client=q=>String(q.company||q.customer||q.clientName||'Unassigned Client').trim()||'Unassigned Client',salesperson=q=>String(q.salesperson||q.salesPerson||q.agent||'—').trim()||'—',cancel=q=>['cancelled','declined'].includes(String(q.quotationStatus||'').toLowerCase())||String(q.orderStatus||'').toLowerCase()==='cancelled';
+const explicitlyCompleted=q=>String(q?.orderStatus||'').trim().toLowerCase()==='completed';
+const positivePayments=q=>(q?.payments||[]).filter(p=>N(p?.amount)>0);
+function autoReconciled(q){if(String(q?.orderStatus||'').trim().toLowerCase()!=='delivered')return false;const t=totals(q);return t.grand>0&&positivePayments(q).length>0&&t.balance<=.004}
+const done=q=>explicitlyCompleted(q)||autoReconciled(q);
+function date(q){const completed=String(q?.completedDate||q?.completedAt||'').slice(0,10);if(completed)return completed;if(autoReconciled(q)){const dates=positivePayments(q).map(p=>String(p.date||p.createdAt||'').slice(0,10)).filter(Boolean).sort();if(dates.length)return dates[dates.length-1]}return String(q?.deliveredDate||q?.date||q?.createdAt||'').slice(0,10)}
+const month=q=>date(q).slice(0,7);
 function live(q){let subtotal=0,discount=0,cogs=0;for(const i of(q.items||[])){subtotal+=N(i.qty)*N(i.price);discount+=N(i.discount);cogs+=N(i.qty)*N(i.cost)}const net=Math.max(0,subtotal-discount),vat=q.vatEnabled?net*N(q.vatRate)/100:0;return{net,cogs,grand:net+vat}}
 function totals(q){const l=live(q),p=q.profitSummary||{},snap=done(q)&&Number.isFinite(+p.netSales)&&Number.isFinite(+p.cogs),net=snap?+p.netSales:l.net,cogs=snap?+p.cogs:l.cogs,profit=snap&&Number.isFinite(+p.grossProfit)?+p.grossProfit:net-cogs,paid=(q.payments||[]).reduce((s,x)=>s+N(x.amount),0);return{net,cogs,profit,grand:l.grand,paid,balance:Math.max(0,l.grand-paid)}}
 function expenseDate(x){return String(x.date||x.createdAt||'').slice(0,10)}
