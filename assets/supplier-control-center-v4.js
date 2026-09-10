@@ -71,5 +71,6 @@ $('#refresh').onclick=loadAll;$('#supplierLogin').onclick=()=>location.href='sup
 function logout(){clearSession();location.reload()}$('#logout').onclick=logout;$('#switchAdmin').onclick=logout;
 window.addEventListener('error',e=>setBoot('Control Center error: '+(e.message||'Unknown error'),'bad'));
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&SESSION)loadAll()});setInterval(()=>{if(!document.hidden&&SESSION&&!$('#app').classList.contains('hidden'))loadAll()},30000);
+ensureQuoteModal();
 bootstrap();
 })();
