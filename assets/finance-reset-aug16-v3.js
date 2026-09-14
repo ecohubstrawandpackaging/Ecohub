@@ -168,9 +168,8 @@ function boot(){
     const opening=baselineTotal(account);
     const display=filtered.slice().reverse();
     let html=display.map(({e,cashIn,cashOut,accountBalance,totalBalance})=>{
-      const bal=account?accountBalance:totalBalance;
       const isSet=R(e);
-      return `<tr><td>${esc(e.date)}</td><td>${esc(e.time||'')}</td><td><span class="pill ${cashIn>0?'green':'orange'}">${esc(isSet?'Balance Reconciliation':e.transactionType)}</span></td><td>${esc(e.clientOrSupplier||'—')}</td><td>${esc(e.account||'—')}</td><td class="num">${cashIn>0?E.peso(cashIn):'—'}</td><td class="num">${cashOut>0?E.peso(cashOut):'—'}</td><td class="num"><b>${E.peso(bal)}</b></td><td>${esc(e.referenceNumber||'—')}</td><td>${esc(isSet?`SET exact balance to ${E.peso(RV(e))}${e.remarks?' · '+e.remarks:''}`:(e.remarks||''))}</td></tr>`;
+      return `<tr data-ledger-id="${esc(e.id)}"><td>${esc(e.date)}</td><td>${esc(e.time||'')}</td><td><span class="pill ${cashIn>0?'green':'orange'}">${esc(isSet?'Balance Reconciliation':e.transactionType)}</span></td><td>${esc(e.clientOrSupplier||'—')}</td><td>${esc(e.account||'—')}</td><td class="num">${cashIn>0?E.peso(cashIn):'—'}</td><td class="num">${cashOut>0?E.peso(cashOut):'—'}</td><td class="num"><b>${E.peso(accountBalance)}</b><div style="font-size:10px;color:var(--ink-soft);white-space:nowrap">${esc(e.account||'Unassigned')} · Total cash ${E.peso(totalBalance)}</div></td><td>${esc(e.referenceNumber||'—')}</td><td>${esc(isSet?`SET exact balance to ${E.peso(RV(e))}${e.remarks?' · '+e.remarks:''}`:(e.remarks||''))}</td></tr>`;
     }).join('');
     const openingRow=`<tr style="background:var(--sage-light)"><td>${esc(RD())}</td><td>${esc(RT())}</td><td><span class="pill green">BEGINNING BALANCE</span></td><td>—</td><td>${account?esc(account):'All audited accounts'}</td><td class="num">—</td><td class="num">—</td><td class="num"><b>${E.peso(opening)}</b></td><td>CURRENT-BALANCE-RESET</td><td>${esc(baselineBreakdown(account)||'No opening balance recorded')}</td></tr>`;
     body.innerHTML=(html||'')+openingRow;
@@ -191,8 +190,22 @@ function boot(){
       const card=document.createElement('div');card.className='kpi';card.dataset.totalClientPaid='1';card.innerHTML=`<div class="lbl">Client Payments Since Aug 16</div><div class="val">${E.peso(s.totalClientPaymentsSinceReset)}</div>`;incomeGrid.appendChild(card);
     }
     const note=container.querySelector('.topbar+ p');if(note)note.innerHTML=`Finance begins from the <b>August 16, 2026 audited beginning balance</b>. Older activity is history only. Current Running Balance starts at <b>${E.peso(baselineTotal())}</b> and moves only with valid transactions after each account's reset.`;
-    const cashH=headings.find(h=>h.textContent.trim().startsWith('Cash Ledger'));if(cashH)cashH.textContent='Cash Ledger — Running Balance from Aug 16 Beginning Balance';
+    const cashH=headings.find(h=>h.textContent.trim().startsWith('Cash Ledger'));
+    if(cashH){
+      cashH.textContent='Cash Ledger — Per-Account Running Balance';
+      let balanceGrid=container.querySelector('[data-live-account-balances]');
+      if(!balanceGrid){
+        balanceGrid=document.createElement('div');
+        balanceGrid.dataset.liveAccountBalances='1';
+        balanceGrid.className='grid kpi-grid';
+        balanceGrid.style.marginBottom='14px';
+        cashH.insertAdjacentElement('afterend',balanceGrid);
+      }
+      balanceGrid.innerHTML=currentBalances().map(row=>`<div class="kpi"><div class="lbl">${esc(row.name)} Current Balance</div><div class="val">${E.peso(row.balance)}</div></div>`).join('');
+    }
     rebuildLedger(container);
+    const balanceHead=container.querySelector('#fin-ledger-body')?.closest('table')?.querySelectorAll('thead th')?.[7];
+    if(balanceHead) balanceHead.textContent='Account Running Balance';
     container.querySelector('#lf-account')?.addEventListener('change',()=>setTimeout(()=>rebuildLedger(container),0));
     container.querySelector('#lf-type')?.addEventListener('change',()=>setTimeout(()=>rebuildLedger(container),0));
   }
