@@ -10,6 +10,117 @@
     const state=E.state;
     const observedBodies=new WeakSet();
     let activeModal=null;
+    let lastUndo=null;
+
+    function clone(value){
+      return value==null?value:JSON.parse(JSON.stringify(value));
+    }
+
+    function upsertState(listName,item,key){
+      const list=state[listName]||(state[listName]=[]);
+      const field=key||'id';
+      const index=list.findIndex(row=>row&&row[field]===item[field]);
+      if(index>=0) list[index]=clone(item);
+      else list.push(clone(item));
+    }
+
+    function undoLabel(entry,linked){
+      if(linked.kind==='quotation') return linked.quotation.number+' payment · '+E.peso(Number(entry.cashIn)||Number(entry.cashOut)||0);
+      if(linked.kind==='expense') return 'Expense · '+E.peso(Number(entry.cashOut)||0);
+      if(linked.kind==='supplier') return 'Supplier payment · '+E.peso(Number(entry.cashOut)||0);
+      if(linked.kind==='transfer') return 'Fund transfer · '+E.peso(Number(entry.cashIn)||Number(entry.cashOut)||0);
+      return (entry.clientOrSupplier||entry.transactionType||'Finance transaction')+' · '+E.peso(Number(entry.cashIn)||Number(entry.cashOut)||0);
+    }
+
+    function makeUndo(entry,linked){
+      const payload={
+        version:1,
+        id:'finance-undo-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),
+        deletedAt:new Date().toISOString(),
+        label:undoLabel(entry,linked),
+        ledgers:clone(linked.kind==='transfer'?linked.entries:[entry])
+      };
+      if(linked.kind==='quotation') payload.quotation=clone(linked.quotation);
+      if(linked.kind==='expense') payload.expense=clone(linked.expense);
+      if(linked.kind==='supplier'){
+        payload.supplierPayment=clone(linked.supplierPayment);
+        const ids=new Set((linked.supplierPayment.relatedPayables||[]).map(row=>row.payableId));
+        payload.payables=clone((state.payables||[]).filter(row=>ids.has(row.id)));
+      }
+      return payload;
+    }
+
+    function updateUndoButtons(){
+      document.querySelectorAll('[data-fin-undo]').forEach(button=>{
+        button.disabled=!lastUndo;
+        button.textContent=lastUndo?'Undo Last Delete — '+lastUndo.label:'Undo Last Delete';
+        button.title=lastUndo?'Deleted '+new Date(lastUndo.deletedAt).toLocaleString():'No deleted Finance transaction to restore';
+      });
+    }
+
+    function installUndoButton(container,table){
+      let wrap=container.querySelector('[data-fin-undo-wrap]');
+      if(!wrap){
+        wrap=document.createElement('div');
+        wrap.dataset.finUndoWrap='1';
+        wrap.className='actions';
+        wrap.style.cssText='margin:0 0 10px;justify-content:flex-end';
+        wrap.innerHTML='<button type="button" class="btn small" data-fin-undo>Undo Last Delete</button>';
+        (table&&table.parentElement?table.parentElement:container).insertBefore(wrap,table||null);
+        wrap.querySelector('[data-fin-undo]').addEventListener('click',()=>undoLastDelete(container));
+      }
+      updateUndoButtons();
+    }
+
+    async function loadLastUndo(){
+      if(!E.storageGet) return;
+      try{ lastUndo=await E.storageGet('financeUndo:last')||null; }
+      catch(err){ console.warn('Could not load Finance undo snapshot',err); }
+      updateUndoButtons();
+    }
+
+    async function saveUndo(payload){
+      await E.storageSet('financeUndo:last',payload);
+      lastUndo=payload;
+      updateUndoButtons();
+    }
+
+    async function undoLastDelete(container){
+      if(!lastUndo){ E.toast('No deleted Finance transaction to restore'); return; }
+      const payload=clone(lastUndo);
+      const button=container.querySelector('[data-fin-undo]');
+      if(button) button.disabled=true;
+      try{
+        if(payload.quotation){
+          upsertState('quotations',payload.quotation,'number');
+          await E.storageSet('quotation:'+payload.quotation.number,payload.quotation);
+        }
+        if(payload.expense){
+          upsertState('expenses',payload.expense);
+          await E.storageSet('expense:'+payload.expense.id,payload.expense);
+        }
+        if(payload.supplierPayment){
+          upsertState('supplierPayments',payload.supplierPayment);
+          await E.storageSet('supplierPayment:'+payload.supplierPayment.id,payload.supplierPayment);
+        }
+        for(const payable of (payload.payables||[])){
+          upsertState('payables',payable);
+          await E.storageSet('payable:'+payable.id,payable);
+        }
+        for(const ledger of (payload.ledgers||[])){
+          upsertState('cashLedger',ledger);
+          await E.storageSet('cashledger:'+ledger.id,ledger);
+        }
+        await E.storageDelete('financeUndo:last');
+        lastUndo=null;
+        refresh(container,'Deleted Finance transaction restored');
+      }catch(err){
+        console.error(err);
+        lastUndo=payload;
+        updateUndoButtons();
+        E.toast('Undo failed. The recovery snapshot was kept.');
+      }
+    }
 
     function esc(value){
       return String(value==null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -38,9 +149,9 @@
         headRow.appendChild(th);
       }
 
-      const entries=ledgerRows(container);
-      Array.from(body.querySelectorAll('tr')).forEach((row,index)=>{
-        const entry=entries[index];
+      installUndoButton(container,table);
+      Array.from(body.querySelectorAll('tr[data-ledger-id]')).forEach(row=>{
+        const entry=(state.cashLedger||[]).find(item=>item.id===row.dataset.ledgerId);
         if(!entry || row.querySelector('[data-fin-actions-cell]')) return;
         const cell=document.createElement('td');
         cell.dataset.finActionsCell='1';
@@ -241,28 +352,38 @@
       const entry=(state.cashLedger||[]).find(item=>item.id===id);
       if(!entry) return;
       const linked=linkedRecord(entry);
-      const message=linked.kind==='transfer'?'Delete both sides of this fund transfer?':linked.kind==='quotation'?'Delete this payment from '+linked.quotation.number+'?':linked.kind==='expense'?'Delete this expense from both Expenses and Finance?':linked.kind==='supplier'?'Delete this supplier payment and restore the linked payable balance?':'Delete this cash ledger entry?';
-      if(!window.confirm(message+' This cannot be undone.')) return;
+      const message=linked.kind==='transfer'?'Delete both sides of this fund transfer?':linked.kind==='quotation'?'Delete this payment from '+linked.quotation.number+'?':linked.kind==='expense'?'Delete this expense from both Expenses and Finance?':linked.kind==='supplier'?'Delete this supplier payment and restore the linked payable balance?':'Delete this exact cash ledger entry?';
+      if(!window.confirm(message+' You can restore it with Undo Last Delete.')) return;
 
-      if(linked.kind==='quotation'){
-        linked.quotation.payments=(linked.quotation.payments||[]).filter(payment=>payment.id!==linked.payment.id);
-        await E.storageSet('quotation:'+linked.quotation.number,linked.quotation);
-      }else if(linked.kind==='expense'){
-        state.expenses=(state.expenses||[]).filter(expense=>expense.id!==linked.expense.id);
-        await E.storageDelete('expense:'+linked.expense.id);
-      }else if(linked.kind==='supplier'){
-        for(const relation of (linked.supplierPayment.relatedPayables||[])){
-          const payable=(state.payables||[]).find(item=>item.id===relation.payableId);
-          if(!payable) continue;
-          payable.amountPaid=Math.max(0,(Number(payable.amountPaid)||0)-(Number(relation.amount)||0));
-          if(E.recomputePayableTotals) E.recomputePayableTotals(payable);
-          await E.storageSet('payable:'+payable.id,payable);
+      const undo=makeUndo(entry,linked);
+      try{ await saveUndo(undo); }
+      catch(err){ console.error(err); E.toast('Delete stopped because the recovery snapshot could not be saved'); return; }
+
+      try{
+        if(linked.kind==='quotation'){
+          linked.quotation.payments=(linked.quotation.payments||[]).filter(payment=>payment.id!==linked.payment.id);
+          await E.storageSet('quotation:'+linked.quotation.number,linked.quotation);
+        }else if(linked.kind==='expense'){
+          state.expenses=(state.expenses||[]).filter(expense=>expense.id!==linked.expense.id);
+          await E.storageDelete('expense:'+linked.expense.id);
+        }else if(linked.kind==='supplier'){
+          for(const relation of (linked.supplierPayment.relatedPayables||[])){
+            const payable=(state.payables||[]).find(item=>item.id===relation.payableId);
+            if(!payable) continue;
+            payable.amountPaid=Math.max(0,(Number(payable.amountPaid)||0)-(Number(relation.amount)||0));
+            if(E.recomputePayableTotals) E.recomputePayableTotals(payable);
+            await E.storageSet('payable:'+payable.id,payable);
+          }
+          state.supplierPayments=(state.supplierPayments||[]).filter(payment=>payment.id!==linked.supplierPayment.id);
+          await E.storageDelete('supplierPayment:'+linked.supplierPayment.id);
         }
-        state.supplierPayments=(state.supplierPayments||[]).filter(payment=>payment.id!==linked.supplierPayment.id);
-        await E.storageDelete('supplierPayment:'+linked.supplierPayment.id);
+        await removeLedgerEntries(linked.kind==='transfer'?linked.entries:[entry]);
+        refresh(container,'Exact transaction deleted — Undo is available');
+      }catch(err){
+        console.error(err);
+        E.toast('Delete was interrupted. Use Undo Last Delete to restore the saved snapshot.');
+        updateUndoButtons();
       }
-      await removeLedgerEntries(linked.kind==='transfer'?linked.entries:[entry]);
-      refresh(container,'Transaction deleted');
     }
 
     function refresh(container,message){
@@ -280,6 +401,7 @@
 
     const current=document.getElementById('main-content');
     if(current) enhance(current);
+    loadLastUndo().then(()=>{ if(current) enhance(current); });
   }
 
   boot();
