@@ -73,12 +73,49 @@ function boot(){
   const week=d=>{const x=new Date(d+'T00:00:00'),q=x.getDay();x.setDate(x.getDate()-(q===0?6:q-1));return x.toISOString().slice(0,10);};
   const totalClientPaymentsSinceReset=()=> (S.quotations||[]).reduce((sum,q)=>sum+(q?.payments||[]).filter(p=>String(p?.date||'')>=RD()).reduce((s,p)=>s+N(p.amount),0),0);
 
+  function receivablePeriod(ym){
+    const key=typeof ym==='string'?ym:`${N(ym?.year)}-${String(N(ym?.month)).padStart(2,'0')}`;
+    const start=/^\d{4}-\d{2}$/.test(key)?key+'-01':E.todayISO().slice(0,7)+'-01';
+    const d=new Date(start+'T00:00:00');d.setMonth(d.getMonth()+1);d.setDate(0);
+    return{key:start.slice(0,7),start,end:d.toISOString().slice(0,10)};
+  }
+  function receivableDate(q){
+    return String(q?.approvedDate||q?.orderConfirmedDate||q?.poDate||q?.date||q?.createdAt||'').slice(0,10);
+  }
+  function receivableEligible(q){
+    const qs=String(q?.quotationStatus||'').trim().toLowerCase(),os=String(q?.orderStatus||'').trim().toLowerCase();
+    const paid=(q?.payments||[]).some(p=>N(p?.amount)>0);
+    return !['cancelled','declined','rejected','expired'].includes(qs)&&os!=='cancelled'&&(
+      qs==='approved'||paid||['for production','preparing for production','ongoing production','for quality check','quality checking','ready for release','ready for pick-up','delivered','completed'].includes(os)
+    );
+  }
+  function quotationGrand(q){
+    try{return N(E.quotationPaymentInfo(q)?.grand||E.quotationTotals(q)?.grand)}catch(_){return 0;}
+  }
+  function paidThrough(q,end){
+    return (q?.payments||[]).filter(p=>N(p?.amount)>0&&String(p?.date||p?.createdAt||'').slice(0,10)<=end).reduce((s,p)=>s+N(p.amount),0);
+  }
+  E.receivableRollForward=function(ym){
+    const p=receivablePeriod(ym),prior=new Date(p.start+'T00:00:00');prior.setDate(prior.getDate()-1);const priorEnd=prior.toISOString().slice(0,10);
+    const rows=(S.quotations||[]).filter(receivableEligible).map(q=>{
+      const activated=receivableDate(q),grand=quotationGrand(q);
+      if(!activated||activated>p.end||grand<=0)return null;
+      const before=activated<p.start?Math.max(0,grand-paidThrough(q,priorEnd)):0;
+      const added=activated>=p.start&&activated<=p.end?grand:0;
+      const ending=Math.max(0,grand-paidThrough(q,p.end));
+      const collected=Math.max(0,before+added-ending);
+      return{q,activated,beginning:before,newReceivable:added,collections:collected,ending};
+    }).filter(Boolean);
+    const sum=k=>rows.reduce((s,r)=>s+N(r[k]),0);
+    return{period:p,rows,beginning:sum('beginning'),newReceivables:sum('newReceivable'),collectionsApplied:sum('collections'),ending:sum('ending')};
+  };
+
   E.computeFinanceSummary=function(ym){
     ym=ym||S.selectedMonth;
     const t=E.todayISO(),w=week(t),mm=e=>E.inMonth(e.date,ym),b=currentBalances(),tc=b.reduce((s,a)=>s+a.balance,0);
     const partnerBalance=b.filter(a=>String(a.name).startsWith('Partner -')).reduce((s,a)=>s+a.balance,0);
     const bank=b.filter(a=>!['Cash on Hand','GCash','Maya','Petty Cash'].includes(a.name)&&!String(a.name).startsWith('Partner -'));
-    const rec=(S.quotations||[]).filter(E.isConfirmed).reduce((s,q)=>s+E.quotationPaymentInfo(q).remainingBalance,0);
+    const receivables=E.receivableRollForward(ym),rec=receivables.ending;
     const pay=E.computeOutstandingSupplierPayables(),iv=E.currentInventoryValue?E.currentInventoryValue():0;
     return{
       totalCash:tc,cashOnHand:balAt('Cash on Hand'),totalBank:bank.reduce((s,a)=>s+a.balance,0),partnerBalance,
@@ -91,7 +128,9 @@ function boot(){
       expensesToday:flow(e=>['Expense','Other Expense'].includes(e.transactionType)&&e.date===t).cashOut,
       expensesMonth:flow(e=>['Expense','Other Expense'].includes(e.transactionType)&&mm(e)).cashOut,
       supplierPaymentsMonth:flow(e=>e.transactionType==='Supplier Payment'&&mm(e)).cashOut,
-      outstandingReceivables:rec,outstandingPayables:pay,netCashPosition:tc+rec-pay,netOperatingPosition:tc+iv+rec-pay,
+      outstandingReceivables:rec,receivablesBeginning:receivables.beginning,receivablesNew:receivables.newReceivables,
+      receivablesCollectionsApplied:receivables.collectionsApplied,receivablesEnding:receivables.ending,
+      outstandingPayables:pay,netCashPosition:tc+rec-pay,netOperatingPosition:tc+iv+rec-pay,
       accountBalances:b
     };
   };
@@ -176,6 +215,15 @@ function boot(){
   }
   function enhanceFinance(container){
     const s=E.computeFinanceSummary(S.selectedMonth);
+    let roll=container.querySelector('[data-receivable-roll-forward]');
+    if(!roll){
+      roll=document.createElement('div');roll.dataset.receivableRollForward='1';roll.className='card';
+      const top=container.querySelector('.topbar');(top||container.firstElementChild)?.insertAdjacentElement('afterend',roll);
+    }
+    if(roll){
+      const period=receivablePeriod(S.selectedMonth),label=new Date(period.start+'T00:00:00').toLocaleDateString('en-PH',{month:'long',year:'numeric'});
+      roll.innerHTML=`<div style="padding:14px 16px 5px"><h3 style="margin:0">Receivables Roll-forward — ${esc(label)}</h3><p style="margin:5px 0;color:var(--ink-soft);font-size:12px">Unpaid balances from the prior month move once into Beginning Carry-over. This month then adds new client receivables and subtracts collections applied.</p></div><div class="kpi-grid" style="padding:8px 14px 14px"><div class="kpi"><div class="lbl">Beginning Carry-over</div><div class="val">${E.peso(s.receivablesBeginning)}</div></div><div class="kpi"><div class="lbl">New Receivables</div><div class="val">${E.peso(s.receivablesNew)}</div></div><div class="kpi"><div class="lbl">Collections Applied</div><div class="val">${E.peso(s.receivablesCollectionsApplied)}</div></div><div class="kpi"><div class="lbl">Ending Receivables</div><div class="val">${E.peso(s.receivablesEnding)}</div><div style="font-size:10px;color:var(--ink-soft)">Carry-over to next month</div></div></div>`;
+    }
     const accountSelect=container.querySelector('#lf-account');
     if(accountSelect){for(const a of accountNames()){if(![...accountSelect.options].some(o=>o.value===a)){const o=document.createElement('option');o.value=a;o.textContent=a;accountSelect.appendChild(o);}}}
     const headings=[...container.querySelectorAll('h3')];
