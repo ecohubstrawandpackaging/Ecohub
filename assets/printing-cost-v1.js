@@ -8,6 +8,9 @@ let installed=false,editing=null;
 function ctx(){return window.SupplierPortalContext}
 function isPrinting(){return ctx()?.profile?.code==='PRINTING'}
 function settings(){return (ctx()?.data?.inventory||[]).filter(x=>x.active!==false)}
+function lineProductName(row){const p=row?.querySelector('.prod');return String(p?.tagName==='SELECT'?(p.selectedOptions?.[0]?.textContent||''):(p?.value||'')).replace(/\[[^\]]+\]\s*$/,'').trim()}
+function isOwned16oz98mm(name){const s=String(name||'').toLowerCase().replace(/\s+/g,'');return s.includes('16oz')&&s.includes('98mm')}
+function ownedCupPrintPrice(name){const exact=settings().find(x=>isOwned16oz98mm(x.product_name)&&String(x.product_name||'').toLowerCase()===String(name||'').toLowerCase())||settings().find(x=>isOwned16oz98mm(x.product_name));return N(exact?.special_price)||BASELINE}
 function costMeta(row={}){
   const kinds=['PET Cup Printing','Paper Cup Printing','Takeout Box Printing','Other Printing'],raw=String(row.notes||'');
   const kind=kinds.find(x=>raw===x||raw.startsWith(x+' · '))||(String(row.product_name||'').toLowerCase().includes('takeout')?'Takeout Box Printing':'Other Printing');
@@ -29,7 +32,7 @@ function install(){
   $('#printingCostSave').onclick=saveCost;
   const lines=$('#quoteLines');
   if(lines)new MutationObserver(seedQuotePrices).observe(lines,{childList:true,subtree:true});
-  document.addEventListener('change',e=>{if(isPrinting()&&(e.target?.classList?.contains('prod')||e.target?.classList?.contains('cat')))setTimeout(seedQuotePrices,0)},true);
+  document.addEventListener('change',e=>{if(isPrinting()&&(e.target?.classList?.contains('prod')||e.target?.classList?.contains('cat')))setTimeout(seedQuotePrices,0)},true);document.addEventListener('input',e=>{if(isPrinting()&&e.target?.classList?.contains('custom'))setTimeout(seedQuotePrices,0)},true);
 }
 function configure(){
   if(!ctx()?.profile)return;
@@ -67,7 +70,19 @@ async function saveCost(){
 }
 function seedQuotePrices(){
   if(!isPrinting())return;
-  $$('#quoteLines .quote-line').forEach(row=>{const input=row.querySelector('.price');if(!input||row.dataset.printingBaselineSeeded)return;row.dataset.printingBaselineSeeded='1';if(N(input.value)<=0){input.value=BASELINE;input.dispatchEvent(new Event('input',{bubbles:true}))}});
+  $('#quoteLines .quote-line').forEach(row=>{
+    const input=row.querySelector('.price'),treat=row.querySelector('.treat'),name=lineProductName(row),owned=isOwned16oz98mm(name);
+    if(!input)return;
+    if(owned){
+      if(treat&&![...treat.options].some(o=>o.value==='EcoHub Stock — Print Only'))treat.add(new Option('EcoHub Stock — Print Only','EcoHub Stock — Print Only'));
+      if(treat){treat.value='EcoHub Stock — Print Only';treat.dispatchEvent(new Event('change',{bubbles:true}))}
+      input.value=ownedCupPrintPrice(name).toFixed(4);row.dataset.printOnlyOwnedCup='1';row.dataset.printingBaselineSeeded='1';
+      let note=row.querySelector('[data-owned-cup-note]');if(!note){note=document.createElement('div');note.dataset.ownedCupNote='1';note.style.cssText='margin:7px 0 0;padding:7px 9px;border-radius:8px;background:#e4f2e9;color:#176b49;font-size:11px;font-weight:800';row.appendChild(note)}note.textContent='EcoHub-owned 16oz 98mm cup stock — supplier payable is PRINTING ONLY.';
+      input.dispatchEvent(new Event('input',{bubbles:true}));return;
+    }
+    if(row.dataset.printOnlyOwnedCup==='1'){row.dataset.printOnlyOwnedCup='';row.querySelector('[data-owned-cup-note]')?.remove();if(treat?.value==='EcoHub Stock — Print Only'){treat.value='Direct to Client Order';treat.dispatchEvent(new Event('change',{bubbles:true}))}}
+    if(!row.dataset.printingBaselineSeeded){row.dataset.printingBaselineSeeded='1';if(N(input.value)<=0){input.value=BASELINE;input.dispatchEvent(new Event('input',{bubbles:true}))}}
+  });
 }
 function addDirectQuoteEditButtons(){
   for(const q of(ctx()?.quotes||[])){
