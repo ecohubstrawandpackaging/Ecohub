@@ -65,9 +65,14 @@ function boot(){
   }
   function totalAt(end='9999-12-31'){return currentBalances(end).reduce((s,a)=>s+a.balance,0);}
 
+  const partnerHeld=()=>currentBalances().filter(a=>String(a.name).startsWith('Partner -')).reduce((s,a)=>s+a.balance,0);
+  const ownerCash=()=>currentBalances().filter(a=>!String(a.name).startsWith('Partner -')).reduce((s,a)=>s+a.balance,0);
   E.accountBalance=a=>balAt(a);
   E.allAccountBalances=()=>currentBalances();
-  E.totalCashAvailable=()=>totalAt();
+  E.partnerHeldFunds=()=>partnerHeld();
+  E.totalCashAvailable=()=>ownerCash();
+  E.businessCashTotal=()=>totalAt();
+  E.activeFinanceEntries=()=>postBaselineEvents().filter(e=>!R(e));
 
   const flow=filterFn=>postBaselineEvents().filter(e=>!R(e)&&filterFn(e)).reduce((o,e)=>(o.cashIn+=N(e.cashIn),o.cashOut+=N(e.cashOut),o),{cashIn:0,cashOut:0});
   const week=d=>{const x=new Date(d+'T00:00:00'),q=x.getDay();x.setDate(x.getDate()-(q===0?6:q-1));return x.toISOString().slice(0,10);};
@@ -112,13 +117,14 @@ function boot(){
 
   E.computeFinanceSummary=function(ym){
     ym=ym||S.selectedMonth;
-    const t=E.todayISO(),w=week(t),mm=e=>E.inMonth(e.date,ym),b=currentBalances(),tc=b.reduce((s,a)=>s+a.balance,0);
+    const t=E.todayISO(),w=week(t),mm=e=>E.inMonth(e.date,ym),b=currentBalances(),businessCash=b.reduce((s,a)=>s+a.balance,0);
     const partnerBalance=b.filter(a=>String(a.name).startsWith('Partner -')).reduce((s,a)=>s+a.balance,0);
+    const totalCash=businessCash-partnerBalance;
     const bank=b.filter(a=>!['Cash on Hand','GCash','Maya','Petty Cash'].includes(a.name)&&!String(a.name).startsWith('Partner -'));
     const receivables=E.receivableRollForward(ym),rec=receivables.ending;
     const pay=E.computeOutstandingSupplierPayables(),iv=E.currentInventoryValue?E.currentInventoryValue():0;
     return{
-      totalCash:tc,cashOnHand:balAt('Cash on Hand'),totalBank:bank.reduce((s,a)=>s+a.balance,0),partnerBalance,
+      totalCash,partnerHeldTotal:partnerBalance,businessCash,cashOnHand:balAt('Cash on Hand'),totalBank:bank.reduce((s,a)=>s+a.balance,0),partnerBalance,
       gcashBalance:balAt('GCash'),mayaBalance:balAt('Maya'),inventoryValue:iv,
       collectionsToday:flow(e=>e.transactionType==='Client Payment'&&e.date===t).cashIn,
       collectionsWeek:flow(e=>e.transactionType==='Client Payment'&&e.date>=w&&e.date<=t).cashIn,
@@ -130,7 +136,7 @@ function boot(){
       supplierPaymentsMonth:flow(e=>e.transactionType==='Supplier Payment'&&mm(e)).cashOut,
       outstandingReceivables:rec,receivablesBeginning:receivables.beginning,receivablesNew:receivables.newReceivables,
       receivablesCollectionsApplied:receivables.collectionsApplied,receivablesEnding:receivables.ending,
-      outstandingPayables:pay,netCashPosition:tc+rec-pay,netOperatingPosition:tc+iv+rec-pay,
+      outstandingPayables:pay,netCashPosition:businessCash+rec-pay,netOperatingPosition:businessCash+iv+rec-pay,
       accountBalances:b
     };
   };
