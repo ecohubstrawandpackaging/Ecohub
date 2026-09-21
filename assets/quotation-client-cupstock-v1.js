@@ -38,9 +38,9 @@ boot();
   document.head.appendChild(s);
 })();
 ;(function(){
-  if(document.querySelector('script[data-finance-reset-v3]'))return;
+  if(window.__financeAug16FixV3||document.querySelector('script[data-finance-reset-v3],script[src*="finance-reset-aug16-v3.js"]'))return;
   const s=document.createElement('script');
-  s.src='assets/finance-reset-aug16-v3.js?v=20260828-1806';
+  s.src='assets/finance-reset-aug16-v3.js?v=20260921-finance-category-reconciliation-v2';
   s.dataset.financeResetV3='1';
   s.async=false;
   s.onerror=()=>console.error('Finance Reset V3 failed to load');
