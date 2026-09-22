@@ -1,7 +1,7 @@
 (function(){
   'use strict';
 
-  const UI={tab:'PRINTING',selected:new Set(),open:new Set(),classic:false,refreshToken:0};
+  const UI={tab:'PRINTING',selected:new Set(),open:new Set(),classic:false,refreshToken:0,undo:null,undoLoaded:false};
 
   function waitForApp(){
     const E=window.__ecohub;
@@ -84,6 +84,43 @@
       values.forEach(value=>{if(value)fresh.push(value);});
     }
     E.state.payables=fresh;
+    if(!UI.undoLoaded){
+      try{ UI.undo=await E.storageGet('supplierPayableUndo:last')||null; }
+      catch(err){ console.warn('Could not load Supplier Payable undo snapshot',err); }
+      UI.undoLoaded=true;
+    }
+  }
+
+  function clone(value){ return JSON.parse(JSON.stringify(value)); }
+  function linkedPayments(E,payableId){
+    return (E.state.supplierPayments||[]).map(payment=>{
+      const rows=(payment.relatedPayables||[]).filter(row=>row.payableId===payableId);
+      const allocated=rows.reduce((sum,row)=>sum+(Number(row.amount)||0),0);
+      return allocated>0?{payment,allocated}:null;
+    }).filter(Boolean);
+  }
+  function linkedSummary(E,pay){
+    const links=linkedPayments(E,pay.id);
+    if(!links.length)return (Number(pay.amountPaid)||0)>0?'<div class="spp-meta" style="color:#8a5a00">Legacy paid entry · no individual Finance link</div>':'';
+    const allocated=links.reduce((sum,row)=>sum+row.allocated,0);
+    const batches=links.reduce((sum,row)=>sum+(Number(row.payment.amountPaid)||0),0);
+    return '<div class="spp-meta" style="color:#186434">Finance linked: '+money(allocated)+' allocation · '+money(batches)+' batch'+(links.length===1?'':'es')+'</div>';
+  }
+  async function saveUndo(E,pay,action){
+    const snapshot={action,payable:clone(pay),savedAt:new Date().toISOString()};
+    await E.storageSet('supplierPayableUndo:last',snapshot);
+    UI.undo=snapshot;
+  }
+  async function undoLast(E,container,classicRender){
+    if(!UI.undo||!UI.undo.payable){E.toast('No Supplier Payable change to undo');return;}
+    const pay=clone(UI.undo.payable);
+    const index=(E.state.payables||[]).findIndex(row=>row.id===pay.id);
+    if(index>=0)E.state.payables[index]=pay;else E.state.payables.unshift(pay);
+    await E.storageSet('payable:'+pay.id,pay);
+    await E.storageDelete('supplierPayableUndo:last');
+    UI.undo=null;
+    E.toast('Supplier Payable restored');
+    await renderPage(E,container,classicRender);
   }
 
   async function renderPage(E,container,classicRender){
@@ -150,13 +187,14 @@
     const dueSoon=rows.filter(p=>status(p)==='Due Soon'||status(p)==='Due Today').reduce((sum,p)=>sum+balance(p),0);
 
     container.innerHTML=`
-      <div class="topbar"><div class="titleblock"><p class="eyebrow">Supplier Payables</p><h2>Packaging & Printing Payables</h2><p class="spp-help">Separate supplier views, quotation/date batches, and line-level or whole-batch payments. Finance changes only after Save Payment.</p></div><div class="actions spp-actions-mobile"><button class="btn" id="spp-refresh">Refresh</button><button class="btn" id="spp-classic">Full Editor</button></div></div>
+      <div class="topbar"><div class="titleblock"><p class="eyebrow">Supplier Payables</p><h2>Packaging & Printing Payables</h2><p class="spp-help">Separate supplier views, quotation/date batches, and line-level or whole-batch payments. Finance changes only after Save Payment. Paid or Finance-linked lines are protected from direct deletion.</p></div><div class="actions spp-actions-mobile"><button class="btn" id="spp-undo" ${UI.undo?'':'disabled'}>${UI.undo?'Undo Last Change':'Nothing to Undo'}</button><button class="btn" id="spp-refresh">Refresh</button><button class="btn" id="spp-classic">Full Editor</button></div></div>
       <div class="card"><div class="spp-tabs"><button class="spp-tab ${UI.tab==='PACKAGING'?'active':''}" data-spp-tab="PACKAGING">📦 Packaging / EcoCycle</button><button class="spp-tab ${UI.tab==='PRINTING'?'active':''}" data-spp-tab="PRINTING">🖨️ Printed Cups / Printing Supplier</button><button class="spp-tab ${UI.tab==='ALL'?'active':''}" data-spp-tab="ALL">All Supplier Payables</button></div><p class="spp-help" style="margin:10px 0 0">Tap a checkbox for individual lines. Tap <b>Select Batch</b> or long-press a quotation header to select the whole quotation.</p></div>
       <div class="kpi-grid"><div class="kpi"><div class="lbl">Outstanding</div><div class="val">${money(outstanding)}</div></div><div class="kpi"><div class="lbl">Already Paid</div><div class="val">${money(paid)}</div></div><div class="kpi"><div class="lbl">Overdue</div><div class="val">${money(overdue)}</div></div><div class="kpi"><div class="lbl">Due Today / Soon</div><div class="val">${money(dueSoon)}</div></div><div class="kpi"><div class="lbl">Quotation / PO Batches</div><div class="val">${groups.length}</div></div></div>
       <div id="spp-payment-slot"></div>
       <div id="spp-groups">${groups.length?groups.map(groupHtml).join(''):'<div class="card"><div class="empty-state">No supplier payables in this view.</div></div>'}</div>`;
 
     container.querySelectorAll('[data-spp-tab]').forEach(button=>button.onclick=()=>{UI.tab=button.dataset.sppTab;UI.selected.clear();draw(E,container,classicRender);});
+    container.querySelector('#spp-undo').onclick=()=>undoLast(E,container,classicRender);
     container.querySelector('#spp-refresh').onclick=()=>renderPage(E,container,classicRender);
     container.querySelector('#spp-classic').onclick=()=>{UI.classic=true;renderPage(E,container,classicRender);};
     wireGroups(E,container,classicRender,groups);
@@ -175,12 +213,12 @@
       <input class="spp-check spp-group-check" type="checkbox" aria-label="Select batch" ${allSelected?'checked':''} ${billable.length?'':'disabled'}>
       <div><div class="spp-batch-title">${esc(group.reference)}</div><div class="spp-meta">${esc(group.supplier)} · Quotation ${formatDate(group.date)} · ${group.rows.length} line${group.rows.length===1?'':'s'}</div></div>
       <div class="spp-metric spp-hide-mobile"><small>Total</small><b>${money(total)}</b></div><div class="spp-metric spp-hide-tablet"><small>Paid</small><b>${money(paid)}</b></div><div class="spp-metric"><small>Balance</small><b>${money(remaining)}</b></div><div style="display:flex;gap:7px;align-items:center;justify-content:flex-end">${badge(groupStatus)}<button class="btn small spp-select-batch">${allSelected?'Unselect':'Select Batch'}</button><button class="btn small spp-toggle">${open?'Close':'Open'}</button></div>
-      </div><div class="spp-details ${open?'open':''}">${group.sourceDocument?'<div class="spp-source-note">Source: '+esc(group.sourceDocument)+(group.due?' · Due '+formatDate(group.due):'')+'</div>':''}<div class="table-wrap"><table class="data" style="min-width:1050px"><thead><tr><th></th><th>#</th><th>Product / Printing Line</th><th>Source Note</th><th class="num">Qty</th><th class="num">Unit Cost</th><th class="num">Line Total</th><th class="num">Paid</th><th class="num">Balance</th><th>Due</th><th>Status</th></tr></thead><tbody>${group.rows.map((p,i)=>lineHtml(p,i)).join('')}</tbody></table></div></div></section>`;
+      </div><div class="spp-details ${open?'open':''}">${group.sourceDocument?'<div class="spp-source-note">Source: '+esc(group.sourceDocument)+(group.due?' · Due '+formatDate(group.due):'')+'</div>':''}<div class="table-wrap"><table class="data" style="min-width:1180px"><thead><tr><th></th><th>#</th><th>Product / Printing Line</th><th>Source Note</th><th class="num">Qty</th><th class="num">Unit Cost</th><th class="num">Line Total</th><th class="num">Paid / Finance Link</th><th class="num">Balance</th><th>Due</th><th>Status</th><th>Actions</th></tr></thead><tbody>${group.rows.map((p,i)=>lineHtml(p,i)).join('')}</tbody></table></div></div></section>`;
   }
 
   function lineHtml(pay,index){
     const canSelect=balance(pay)>0.004;
-    return `<tr><td><input class="spp-check spp-line-check" data-id="${esc(pay.id)}" type="checkbox" ${UI.selected.has(pay.id)?'checked':''} ${canSelect?'':'disabled'}></td><td>${Number(pay.batchLineNumber)||index+1}</td><td><b>${esc(pay.productName||'—')}</b><div class="spp-meta">${esc(pay.client||pay.sourceType||'')}</div></td><td>${esc(pay.sourceNotes||pay.remarks||'—')}</td><td class="num">${number(pay.qtyToPurchase||pay.qtyOrdered)}</td><td class="num">${money(pay.supplierUnitCost)}</td><td class="num">${money(pay.totalSupplierCost)}</td><td class="num">${money(pay.amountPaid)}</td><td class="num"><b>${money(balance(pay))}</b></td><td>${formatDate(pay.paymentDueDate)}</td><td>${badge(status(pay))}</td></tr>`;
+    return `<tr><td><input class="spp-check spp-line-check" data-id="${esc(pay.id)}" type="checkbox" ${UI.selected.has(pay.id)?'checked':''} ${canSelect?'':'disabled'}></td><td>${Number(pay.batchLineNumber)||index+1}</td><td><b>${esc(pay.productName||'—')}</b><div class="spp-meta">${esc(pay.client||pay.sourceType||'')}</div></td><td>${esc(pay.sourceNotes||pay.remarks||'—')}</td><td class="num">${number(pay.qtyToPurchase||pay.qtyOrdered)}</td><td class="num">${money(pay.supplierUnitCost)}</td><td class="num">${money(pay.totalSupplierCost)}</td><td class="num">${money(pay.amountPaid)}${linkedSummary(window.__ecohub,pay)}</td><td class="num"><b>${money(balance(pay))}</b></td><td>${formatDate(pay.paymentDueDate)}</td><td>${badge(status(pay))}</td><td><div class="actions" style="gap:5px;flex-wrap:nowrap"><button class="btn small" data-spp-edit="${esc(pay.id)}">Edit</button><button class="btn small danger" data-spp-delete="${esc(pay.id)}">Delete</button></div></td></tr>`;
   }
 
   function wireGroups(E,container,classicRender,groups){
@@ -199,6 +237,8 @@
       const groupCheck=section.querySelector('.spp-group-check');
       groupCheck.onchange=toggleGroup;
       section.querySelectorAll('.spp-line-check').forEach(check=>check.onchange=()=>{check.checked?UI.selected.add(check.dataset.id):UI.selected.delete(check.dataset.id);renderPayment(E,container,classicRender);syncGroupChecks(container,groups);});
+      section.querySelectorAll('[data-spp-edit]').forEach(button=>button.onclick=()=>openPayableEditor(E,container,classicRender,button.dataset.sppEdit));
+      section.querySelectorAll('[data-spp-delete]').forEach(button=>button.onclick=()=>deletePayable(E,container,classicRender,button.dataset.sppDelete));
       const header=section.querySelector('[data-longpress-group]');
       let timer=null,longPressed=false;
       const cancel=()=>{if(timer){clearTimeout(timer);timer=null;}header.classList.remove('longpress');};
@@ -219,6 +259,77 @@
       check.indeterminate=count>0&&count<ids.length;
       section.querySelector('.spp-select-batch').textContent=check.checked?'Unselect':'Select Batch';
     });
+  }
+
+  function closeEditor(){ document.querySelector('[data-spp-editor-overlay]')?.remove(); }
+  function openPayableEditor(E,container,classicRender,id){
+    const pay=(E.state.payables||[]).find(row=>row.id===id);
+    if(!pay)return;
+    closeEditor();
+    const paid=Number(pay.amountPaid)||0,links=linkedPayments(E,pay.id);
+    const overlay=document.createElement('div');
+    overlay.dataset.sppEditorOverlay='1';
+    overlay.style.cssText='position:fixed;inset:0;z-index:100000;background:#14231b88;display:grid;place-items:center;padding:16px;overflow:auto';
+    overlay.innerHTML=`<div class="card" style="width:min(760px,100%);max-height:92vh;overflow:auto;border-color:var(--sage);box-shadow:0 20px 60px #0004"><h3 style="margin-top:0">Edit Supplier Payable</h3><p class="spp-help">Paid amount is controlled by posted Supplier Payments so Finance stays balanced. The total cannot be reduced below ${money(paid)} already paid.</p><div class="grid">
+      <div class="field"><label>Supplier</label><input data-pe-supplier value="${esc(pay.supplierName||'')}"></div>
+      <div class="field"><label>Quotation / PO Reference</label><input data-pe-reference value="${esc(pay.referenceNumber||pay.quotationNumber||'')}"></div>
+      <div class="field full"><label>Product / Printing Line</label><input data-pe-product value="${esc(pay.productName||'')}"></div>
+      <div class="field"><label>Quantity</label><input data-pe-qty type="number" min="0" step="0.0001" value="${Number(pay.qtyToPurchase||pay.qtyOrdered)||0}"></div>
+      <div class="field"><label>Unit Cost</label><input data-pe-cost type="number" min="0" step="0.0001" value="${Number(pay.supplierUnitCost)||0}"></div>
+      <div class="field"><label>Payable Total</label><input data-pe-total type="number" min="${paid}" step="0.01" value="${Number(pay.totalSupplierCost)||0}"></div>
+      <div class="field"><label>Due Date</label><input data-pe-due type="date" value="${esc(pay.paymentDueDate||'')}"></div>
+      <div class="field full"><label>Notes</label><input data-pe-notes value="${esc(pay.sourceNotes||pay.remarks||'')}"></div>
+      <div class="field"><label>Already Paid</label><input value="${money(paid)}" disabled></div>
+      <div class="field"><label>Finance Links</label><input value="${links.length?links.length+' payment batch'+(links.length===1?'':'es'):'No linked payment batch'}" disabled></div>
+    </div><div class="actions" style="margin-top:12px"><button class="btn" data-pe-cancel>Cancel</button><button class="btn primary" data-pe-save>Save Payable Changes</button></div></div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('[data-pe-cancel]').onclick=closeEditor;
+    overlay.addEventListener('click',event=>{if(event.target===overlay)closeEditor();});
+    overlay.querySelector('[data-pe-save]').onclick=async()=>{
+      const qty=Number(overlay.querySelector('[data-pe-qty]').value)||0;
+      const cost=Number(overlay.querySelector('[data-pe-cost]').value)||0;
+      const total=Number(overlay.querySelector('[data-pe-total]').value)||0;
+      if(total+0.004<paid){E.toast('Payable total cannot be lower than the amount already paid');return;}
+      const button=overlay.querySelector('[data-pe-save]');button.disabled=true;button.textContent='Saving…';
+      try{
+        await saveUndo(E,pay,'edit');
+        pay.supplierName=overlay.querySelector('[data-pe-supplier]').value.trim()||'Supplier';
+        const reference=overlay.querySelector('[data-pe-reference]').value.trim();
+        pay.referenceNumber=reference;pay.quotationNumber=reference;pay.purchaseOrderNumber=reference;
+        pay.productName=overlay.querySelector('[data-pe-product]').value.trim()||'Payable Item';
+        pay.qtyOrdered=qty;pay.qtyToPurchase=qty;pay.supplierUnitCost=cost;pay.totalSupplierCost=total;
+        pay.fixedTotal=Math.abs(total-(qty*cost))>0.004;
+        pay.paymentDueDate=overlay.querySelector('[data-pe-due]').value;
+        pay.sourceNotes=overlay.querySelector('[data-pe-notes]').value.trim();
+        pay.remainingBalance=Math.max(0,total-paid);
+        pay.paymentStatus=pay.remainingBalance<=.004?'Fully Paid':paid>0?'Partially Paid':pay.dateOrderedFromSupplier?'Unpaid':'For Purchase';
+        pay.lastEditedAt=new Date().toISOString();
+        if(E.pushPayableAudit)E.pushPayableAudit(pay,'Supplier payable edited manually');
+        await E.storageSet('payable:'+pay.id,pay);
+        closeEditor();E.toast('Supplier Payable updated — Undo is available');
+        await renderPage(E,container,classicRender);
+      }catch(err){console.error('Supplier payable edit failed',err);button.disabled=false;button.textContent='Save Payable Changes';E.toast('Supplier Payable was not changed');}
+    };
+  }
+
+  async function deletePayable(E,container,classicRender,id){
+    const pay=(E.state.payables||[]).find(row=>row.id===id);
+    if(!pay)return;
+    const links=linkedPayments(E,id),paid=Number(pay.amountPaid)||0;
+    if(paid>0.004||links.length){
+      E.toast('Paid or Finance-linked payable cannot be deleted here. Edit/delete its Supplier Payment in Finance first.');
+      return;
+    }
+    const label=(pay.referenceNumber||pay.quotationNumber||'No reference')+' — '+(pay.productName||'Payable Item')+' — '+money(pay.totalSupplierCost);
+    if(!window.confirm('Delete this unpaid Supplier Payable line?\n\n'+label+'\n\nYou can restore it with Undo Last Change.'))return;
+    try{
+      await saveUndo(E,pay,'delete');
+      await E.storageDelete('payable:'+pay.id);
+      E.state.payables=(E.state.payables||[]).filter(row=>row.id!==pay.id);
+      UI.selected.delete(pay.id);
+      E.toast('Supplier Payable deleted — Undo is available');
+      await renderPage(E,container,classicRender);
+    }catch(err){console.error('Supplier payable delete failed',err);E.toast('Delete stopped. The payable was not removed.');}
   }
 
   function renderPayment(E,container,classicRender){
