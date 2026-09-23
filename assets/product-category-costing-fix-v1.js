@@ -57,8 +57,7 @@ function enhance(container){
   enhanceRows(container);groupRows(container);
   const body=container.querySelector('#p-body');if(body&&!body.dataset.categoryObserver){body.dataset.categoryObserver='1';new MutationObserver(()=>{enhanceRows(container);groupRows(container)}).observe(body,{childList:true})}
 }
-const baseRender=E.renderProducts;E.renderProducts=function(container){const result=baseRender(container);enhance(container);return result};
+const baseRender=E.renderProducts;E.renderProducts=function(container){const result=baseRender(container);enhance(container);syncMasterCategories();return result};
 const baseSync=E.syncPayablesForQuotation;E.syncPayablesForQuotation=async function(q){const result=await baseSync(q);for(const item of (q?.items||[])){if(!item?.code||!item.category)continue;const p=(S.products||[]).find(x=>x?.code===item.code);if(!p||String(p.category||'').trim())continue;p.category=String(item.category).trim();await E.storageSet('product:'+p.code,p)}return result};
-syncMasterCategories();
 }boot();
 })();
