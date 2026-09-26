@@ -7,7 +7,7 @@
   const GROUPS=[
     ['active','Active Orders'],['pending','Pending / Confirmation'],['production','Production'],
     ['quality','Quality Check'],['ready','Ready for Release'],['delivered-unpaid','Delivered · Unpaid'],
-    ['delivered-paid','Delivered · Paid'],['completed','Completed'],['cancelled','Cancelled / Declined'],
+    ['delivered-paid','Delivered · Paid'],['completed-unpaid','Completed · Unpaid'],['completed','Completed · Fully Paid'],['cancelled','Cancelled / Declined'],
     ['all','All Quotations']
   ];
 
@@ -23,7 +23,7 @@
     const quoteStatus=norm(q&&q.quotationStatus);
     const orderStatus=norm(q&&q.orderStatus);
     if(['cancelled','declined','expired'].includes(quoteStatus)||orderStatus==='cancelled') return 'cancelled';
-    if(orderStatus==='completed') return 'completed';
+    if(orderStatus==='completed') return remaining(q)>0.004?'completed-unpaid':'completed';
     if(['delivered','shipped'].includes(orderStatus)) return remaining(q)>0.004?'delivered-unpaid':'delivered-paid';
     if(['ready for release','ready for pick-up','ready for pickup'].includes(orderStatus)) return 'ready';
     if(['for quality check','quality checking'].includes(orderStatus)) return 'quality';
@@ -110,7 +110,7 @@
       rows.push({row,group,date:String(quotation.date||''),number:String(quotation.number||'')});
     }
 
-    const rank=new Map(['pending','production','quality','ready','delivered-unpaid','delivered-paid','completed','cancelled'].map((group,index)=>[group,index]));
+    const rank=new Map(['pending','production','quality','ready','delivered-unpaid','delivered-paid','completed-unpaid','completed','cancelled'].map((group,index)=>[group,index]));
     rows.sort((a,b)=>(rank.get(a.group)-rank.get(b.group))||b.date.localeCompare(a.date)||b.number.localeCompare(a.number));
     rows.forEach(item=>table.tBodies[0].appendChild(item.row));
 
