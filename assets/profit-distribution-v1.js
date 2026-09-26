@@ -17,11 +17,14 @@ const RECIPIENTS=[
 function show(id){['auth','denied','app'].forEach(x=>$(x).classList.add('hidden'));$(id).classList.remove('hidden')}
 function client(q){return String(q.company||q.customer||q.clientName||'Unassigned Client').trim()||'Unassigned Client'}
 function salesperson(q){return String(q.salesperson||q.salesPerson||q.salesPersonName||q.agent||'—').trim()||'—'}
-function explicitlyCompleted(q){return String(q&&q.orderStatus||'').trim().toLowerCase()==='completed'}
+function orderStatus(q){return String(q&&q.orderStatus||'').trim().toLowerCase()}
 function positivePayments(q){return(q&&q.payments||[]).filter(p=>n(p&&p.amount)>0)}
-function autoReconciled(q){if(String(q&&q.orderStatus||'').trim().toLowerCase()!=='delivered')return false;let subtotal=0,discount=0,vat=0;for(const it of(q.items||[])){subtotal+=n(it.qty)*n(it.price);discount+=n(it.discount)}const net=Math.max(0,subtotal-discount);if(q.vatEnabled)vat=net*n(q.vatRate)/100;const paid=positivePayments(q).reduce((s,p)=>s+n(p.amount),0);return net+vat>0&&positivePayments(q).length>0&&Math.max(0,net+vat-paid)<=.004}
-function completed(q){return explicitlyCompleted(q)||autoReconciled(q)}
-function completedDate(q){const date=String(q&&q.completedDate||q&&q.completedAt||'').slice(0,10);if(date)return date;if(autoReconciled(q)){const dates=positivePayments(q).map(p=>String(p.date||p.createdAt||'').slice(0,10)).filter(Boolean).sort();if(dates.length)return dates[dates.length-1]}return String(q&&q.deliveredDate||q&&q.date||q&&q.createdAt||'').slice(0,10)}
+function fulfillment(q){return ['completed','delivered'].includes(orderStatus(q))}
+function paymentTotals(q){let subtotal=0,discount=0,vat=0;for(const it of(q.items||[])){subtotal+=n(it.qty)*n(it.price);discount+=n(it.discount)}const net=Math.max(0,subtotal-discount);if(q.vatEnabled)vat=net*n(q.vatRate)/100;const grand=net+vat,paid=positivePayments(q).reduce((sum,p)=>sum+n(p.amount),0);return{grand,paid,balance:Math.max(0,grand-paid)}}
+function completed(q){const t=paymentTotals(q);return fulfillment(q)&&t.grand>0&&positivePayments(q).length>0&&t.balance<=.004}
+function finalPaymentDate(q){const dates=positivePayments(q).map(p=>String(p.date||p.createdAt||'').slice(0,10)).filter(Boolean).sort();return dates.length?dates[dates.length-1]:''}
+function fulfillmentDate(q){return orderStatus(q)==='completed'?String(q&&q.completedDate||q&&q.completedAt||q&&q.deliveredDate||'').slice(0,10):String(q&&q.deliveredDate||'').slice(0,10)}
+function completedDate(q){const dates=[fulfillmentDate(q),finalPaymentDate(q)].filter(Boolean).sort();return dates.length?dates[dates.length-1]:String(q&&q.date||q&&q.createdAt||'').slice(0,10)}
 function monthOf(q){return completedDate(q).slice(0,7)}
 function totals(q){let subtotal=0,discount=0,cogs=0;for(const it of(q.items||[])){const qty=n(it.qty);subtotal+=qty*n(it.price);discount+=n(it.discount);cogs+=qty*n(it.cost)}const net=Math.max(0,subtotal-discount);return{net,cogs,profit:net-cogs}}
 function expenseDate(x){return String(x.date||x.createdAt||'').slice(0,10)}
