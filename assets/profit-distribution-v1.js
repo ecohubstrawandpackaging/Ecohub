@@ -19,10 +19,11 @@ function client(q){return String(q.company||q.customer||q.clientName||'Unassigne
 function salesperson(q){return String(q.salesperson||q.salesPerson||q.salesPersonName||q.agent||'—').trim()||'—'}
 function orderStatus(q){return String(q&&q.orderStatus||'').trim().toLowerCase()}
 function positivePayments(q){return(q&&q.payments||[]).filter(p=>n(p&&p.amount)>0)}
+function historicalSettled(q){return !!(q&&q.historicalSettled)&&n(q&&q.historicalSettlementAmount)>0&&!!String(q&&q.historicalSettlementDate||'').slice(0,10)}
 function fulfillment(q){return ['completed','delivered'].includes(orderStatus(q))}
-function paymentTotals(q){let subtotal=0,discount=0,vat=0;for(const it of(q.items||[])){subtotal+=n(it.qty)*n(it.price);discount+=n(it.discount)}const net=Math.max(0,subtotal-discount);if(q.vatEnabled)vat=net*n(q.vatRate)/100;const grand=net+vat,paid=positivePayments(q).reduce((sum,p)=>sum+n(p.amount),0);return{grand,paid,balance:Math.max(0,grand-paid)}}
-function completed(q){const t=paymentTotals(q);return fulfillment(q)&&t.grand>0&&positivePayments(q).length>0&&t.balance<=.004}
-function finalPaymentDate(q){const dates=positivePayments(q).map(p=>String(p.date||p.createdAt||'').slice(0,10)).filter(Boolean).sort();return dates.length?dates[dates.length-1]:''}
+function paymentTotals(q){let subtotal=0,discount=0,vat=0;for(const it of(q.items||[])){subtotal+=n(it.qty)*n(it.price);discount+=n(it.discount)}const net=Math.max(0,subtotal-discount);if(q.vatEnabled)vat=net*n(q.vatRate)/100;const grand=net+vat,paid=Math.max(positivePayments(q).reduce((sum,p)=>sum+n(p.amount),0),historicalSettled(q)?n(q.historicalSettlementAmount):0);return{grand,paid,balance:Math.max(0,grand-paid)}}
+function completed(q){const t=paymentTotals(q);return fulfillment(q)&&t.grand>0&&(positivePayments(q).length>0||historicalSettled(q))&&t.balance<=.004}
+function finalPaymentDate(q){const dates=positivePayments(q).map(p=>String(p.date||p.createdAt||'').slice(0,10)).concat(historicalSettled(q)?[String(q.historicalSettlementDate).slice(0,10)]:[]).filter(Boolean).sort();return dates.length?dates[dates.length-1]:''}
 function fulfillmentDate(q){return orderStatus(q)==='completed'?String(q&&q.completedDate||q&&q.completedAt||q&&q.deliveredDate||'').slice(0,10):String(q&&q.deliveredDate||'').slice(0,10)}
 function completedDate(q){const dates=[fulfillmentDate(q),finalPaymentDate(q)].filter(Boolean).sort();return dates.length?dates[dates.length-1]:String(q&&q.date||q&&q.createdAt||'').slice(0,10)}
 function monthOf(q){return completedDate(q).slice(0,7)}
