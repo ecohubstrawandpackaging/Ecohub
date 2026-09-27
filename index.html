@@ -12,7 +12,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
 <div id="ecohub-loader"><div class="spin"></div><b>Loading EcoHub…</b><br><small>Connecting to the business system.</small></div>
 <script>
 (async()=>{
-    const BUILD='20260927-from-scratch-historical-settlement-v2';
+    const BUILD='20260927-from-scratch-historical-settlement-v3';
   const box=document.getElementById('ecohub-loader');
   try{
     const paths=[
@@ -88,7 +88,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
           E.renderSales=function(container){
             try{
               const all=(E.state.quotations||[]).filter(q=>q && (E.isRevenueRecognized?E.isRevenueRecognized(q):q.orderStatus==='Completed')).map(q=>{
-                const t=E.quotationTotals(q), p=E.quotationPaymentInfo(q);
+                const liveTotals=E.quotationTotals(q), snapshot=q.historicalSettled&&q.profitSummary||null, t=snapshot&&Number.isFinite(Number(snapshot.netSales))&&Number.isFinite(Number(snapshot.cogs))?{...liveTotals,net:Number(snapshot.netSales),cogs:Number(snapshot.cogs),grossProfit:Number.isFinite(Number(snapshot.grossProfit))?Number(snapshot.grossProfit):Number(snapshot.netSales)-Number(snapshot.cogs)}:liveTotals, p=E.quotationPaymentInfo(q);
                 const date=E.revenueRecognitionDate?E.revenueRecognitionDate(q):(q.completedDate||q.date||'');
                 const client=String(q.company||q.customer||'Unassigned Client').trim()||'Unassigned Client';
                 return {q,t,p,date,client,margin:t.net>0?(t.grossProfit/t.net)*100:0};
