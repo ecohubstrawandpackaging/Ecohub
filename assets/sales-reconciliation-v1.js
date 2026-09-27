@@ -17,8 +17,9 @@
     return n(p.grand)>0&&(payments(q).length>0||historicalSettled(q))&&n(p.remainingBalance)<=0.004;
   }
   function recognized(q){return fulfilled(q)&&fullyPaid(q)}
+  function paymentDate(p){return iso(p&&(p.financialReportingDate||p.date||p.createdAt))}
   function finalPaymentDate(q){
-    const dates=payments(q).map(p=>iso(p.date||p.createdAt)).concat(historicalSettled(q)?[iso(q.historicalSettlementDate)]:[]).filter(Boolean).sort();
+    const dates=payments(q).map(paymentDate).concat(historicalSettled(q)?[iso(q.historicalSettlementDate)]:[]).filter(Boolean).sort();
     return dates.length?dates[dates.length-1]:'';
   }
   function fulfillmentDate(q){
@@ -26,6 +27,8 @@
     return iso(q&&q.deliveredDate);
   }
   function recognitionDate(q){
+    const locked=iso(q&&q.financialRecognitionDate);
+    if(locked)return locked;
     const dates=[fulfillmentDate(q),finalPaymentDate(q)].filter(Boolean).sort();
     return dates.length?dates[dates.length-1]:iso(q&&(q.date||q.createdAt));
   }
@@ -48,7 +51,7 @@
     const s=summary();
     let banner=root.querySelector('[data-sales-reconciliation]');
     if(!banner){banner=document.createElement('div');banner.dataset.salesReconciliation='1';banner.className='card';const grid=root.querySelector('.kpi-grid');if(grid)grid.insertAdjacentElement('beforebegin',banner)}
-    if(banner)banner.innerHTML='<div style="padding:12px 15px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div><b>Sales Recognition Check</b><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px">A sale and its profit are recognized only after the order is Delivered/Completed and fully paid. The reporting date is the later of fulfillment or final payment.</div></div><div style="display:flex;gap:7px;flex-wrap:wrap"><span class="pill green">'+s.reflected+' recognized</span><span class="pill '+(s.waitingPayment?'orange':'green')+'">'+s.waitingPayment+' fulfilled · awaiting payment</span></div></div>';
+    if(banner)banner.innerHTML='<div style="padding:12px 15px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div><b>Sales Recognition Check</b><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px">A sale and its profit are recognized only after the order is Delivered/Completed and fully paid. The reporting date is the later of fulfillment or final payment, unless an audited historical period is locked.</div></div><div style="display:flex;gap:7px;flex-wrap:wrap"><span class="pill green">'+s.reflected+' recognized</span><span class="pill '+(s.waitingPayment?'orange':'green')+'">'+s.waitingPayment+' fulfilled · awaiting payment</span></div></div>';
   }
   function schedule(){if(scheduled)return;scheduled=true;requestAnimationFrame(enhance)}
   function boot(){
