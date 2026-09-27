@@ -27,7 +27,7 @@ function finalPaymentDate(q){const dates=positivePayments(q).map(p=>String(p.dat
 function fulfillmentDate(q){return orderStatus(q)==='completed'?String(q&&q.completedDate||q&&q.completedAt||q&&q.deliveredDate||'').slice(0,10):String(q&&q.deliveredDate||'').slice(0,10)}
 function completedDate(q){const dates=[fulfillmentDate(q),finalPaymentDate(q)].filter(Boolean).sort();return dates.length?dates[dates.length-1]:String(q&&q.date||q&&q.createdAt||'').slice(0,10)}
 function monthOf(q){return completedDate(q).slice(0,7)}
-function totals(q){let subtotal=0,discount=0,cogs=0;for(const it of(q.items||[])){const qty=n(it.qty);subtotal+=qty*n(it.price);discount+=n(it.discount);cogs+=qty*n(it.cost)}const net=Math.max(0,subtotal-discount);return{net,cogs,profit:net-cogs}}
+function totals(q){let subtotal=0,discount=0,cogs=0;for(const it of(q.items||[])){const qty=n(it.qty);subtotal+=qty*n(it.price);discount+=n(it.discount);cogs+=qty*n(it.cost)}const net=Math.max(0,subtotal-discount),p=q&&q.profitSummary||{},snap=historicalSettled(q)&&Number.isFinite(Number(p.netSales))&&Number.isFinite(Number(p.cogs));if(snap){const historicalNet=Number(p.netSales),historicalCogs=Number(p.cogs);return{net:historicalNet,cogs:historicalCogs,profit:Number.isFinite(Number(p.grossProfit))?Number(p.grossProfit):historicalNet-historicalCogs}}return{net,cogs,profit:net-cogs}}
 function expenseDate(x){return String(x.date||x.createdAt||'').slice(0,10)}
 function expenseMonth(x){return expenseDate(x).slice(0,7)}
 function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
