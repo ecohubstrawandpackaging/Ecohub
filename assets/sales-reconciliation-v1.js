@@ -5,18 +5,20 @@
   const iso=v=>String(v||'').slice(0,10);
 
   function payments(q){return (Array.isArray(q&&q.payments)?q.payments:[]).filter(p=>n(p&&p.amount)>0)}
+  function historicalSettled(q){return !!(q&&q.historicalSettled)&&n(q&&q.historicalSettlementAmount)>0&&!!iso(q&&q.historicalSettlementDate)}
+  function historicalPaymentInfo(q,base){if(!historicalSettled(q))return base;const grand=n(base&&base.grand),paid=Math.max(n(base&&base.amountPaid),n(q.historicalSettlementAmount),grand);return {...base,amountPaid:paid,remainingBalance:0,status:'Paid · Historical Settlement'} }
   function paymentInfo(q){
-    try{return E.quotationPaymentInfo(q)}catch(_){return {grand:0,amountPaid:0,remainingBalance:0,status:'Unpaid'}}
+    try{return historicalPaymentInfo(q,E.quotationPaymentInfo(q))}catch(_){return {grand:0,amountPaid:0,remainingBalance:0,status:'Unpaid'}}
   }
   function status(q){return String(q&&q.orderStatus||'').trim().toLowerCase()}
   function fulfilled(q){return ['completed','delivered'].includes(status(q))}
   function fullyPaid(q){
     const p=paymentInfo(q);
-    return n(p.grand)>0&&payments(q).length>0&&n(p.remainingBalance)<=0.004;
+    return n(p.grand)>0&&(payments(q).length>0||historicalSettled(q))&&n(p.remainingBalance)<=0.004;
   }
   function recognized(q){return fulfilled(q)&&fullyPaid(q)}
   function finalPaymentDate(q){
-    const dates=payments(q).map(p=>iso(p.date||p.createdAt)).filter(Boolean).sort();
+    const dates=payments(q).map(p=>iso(p.date||p.createdAt)).concat(historicalSettled(q)?[iso(q.historicalSettlementDate)]:[]).filter(Boolean).sort();
     return dates.length?dates[dates.length-1]:'';
   }
   function fulfillmentDate(q){
@@ -53,6 +55,7 @@
     E=window.__ecohub;if(!E){setTimeout(boot,120);return}
     if(window.__ecohubSalesReconciliationV2)return;
     window.__ecohubSalesReconciliationV2=true;
+    if(!E.__historicalSettlementPaymentInfo){const basePaymentInfo=E.quotationPaymentInfo;E.quotationPaymentInfo=function(q){return historicalPaymentInfo(q,basePaymentInfo(q))};E.__historicalSettlementPaymentInfo=true}
     E.isRevenueRecognized=recognized;
     E.revenueRecognitionDate=recognitionDate;
     E.salesReconciliationSummary=summary;
