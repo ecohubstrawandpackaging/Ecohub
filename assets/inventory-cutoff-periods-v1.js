@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-let tries=0,loading=false,loaded=false;
+let tries=0,loading=false,loaded=false,loadPromise=null;
 
 function boot(){
   const E=window.__ecohub;
@@ -55,10 +55,11 @@ function boot(){
   }
   function activeId(){return String(S.settings?.inventoryActivePeriod||'').trim()||periodId();}
 
-  async function ensureLoaded(){
-    if(loaded||loading)return;
+  function ensureLoaded(){
+    if(loaded)return Promise.resolve();
+    if(loadPromise)return loadPromise;
     loading=true;
-    try{
+    loadPromise=(async()=>{try{
       const keys=await E.storageListKeys('inventoryperiod:');
       const values=await Promise.all(keys.map(k=>E.storageGet(k)));
       values.filter(Boolean).forEach(p=>periods.set(p.id,p));
@@ -73,7 +74,8 @@ function boot(){
       await E.storageSet('settings:main',S.settings);
       selectedId=selectedId||id;loaded=true;
     }catch(error){console.error('Could not load inventory cut-off periods',error);}
-    finally{loading=false;}
+    finally{loading=false;loadPromise=null;}})();
+    return loadPromise;
   }
 
   function totals(period){
