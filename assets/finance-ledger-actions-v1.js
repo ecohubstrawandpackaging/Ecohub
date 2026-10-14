@@ -142,19 +142,39 @@
       if(!body) return;
       const table=body.closest('table');
       const headRow=table&&table.querySelector('thead tr');
-      if(headRow && !headRow.querySelector('[data-fin-actions-head]')){
-        const th=document.createElement('th');
-        th.textContent='Actions';
-        th.dataset.finActionsHead='1';
-        headRow.appendChild(th);
+      const existingActionsHead=headRow&&Array.from(headRow.children).find(cell=>String(cell.textContent||'').trim().toLowerCase()==='actions');
+      let actionsHead=existingActionsHead||null;
+      if(headRow && !actionsHead){
+        actionsHead=document.createElement('th');
+        actionsHead.textContent='Actions';
+        actionsHead.dataset.finActionsHead='1';
+        headRow.appendChild(actionsHead);
+      }
+      if(actionsHead){
+        actionsHead.dataset.finActionsHead='1';
+        actionsHead.style.cssText='position:sticky;right:0;z-index:3;background:var(--cream,#fffaf0);min-width:142px';
       }
 
       installUndoButton(container,table);
-      Array.from(body.querySelectorAll('tr[data-ledger-id]')).forEach(row=>{
+      const entries=ledgerRows(container);
+      const renderedRows=Array.from(body.children).filter(row=>row.tagName==='TR' && row.querySelectorAll('td').length>1);
+      renderedRows.forEach((row,index)=>{
+        if(!row.dataset.ledgerId && entries[index]) row.dataset.ledgerId=entries[index].id;
         const entry=(state.cashLedger||[]).find(item=>item.id===row.dataset.ledgerId);
-        if(!entry || row.querySelector('[data-fin-actions-cell]')) return;
+        if(!entry) return;
+
+        const builtInEdit=row.querySelector('.fin-ledger-edit');
+        const builtInDelete=row.querySelector('.fin-ledger-delete');
+        if(builtInEdit && builtInDelete){
+          const builtInCell=builtInEdit.closest('td');
+          if(builtInCell) builtInCell.style.cssText+=';position:sticky;right:0;z-index:2;background:var(--cream,#fffaf0);min-width:142px';
+          return;
+        }
+        if(row.querySelector('[data-fin-actions-cell]')) return;
+
         const cell=document.createElement('td');
         cell.dataset.finActionsCell='1';
+        cell.style.cssText='position:sticky;right:0;z-index:2;background:var(--cream,#fffaf0);min-width:142px';
         cell.innerHTML='<div class="actions" style="flex-wrap:nowrap;gap:6px">'+
           '<button type="button" class="btn small" data-fin-edit="'+esc(entry.id)+'">Edit</button>'+
           '<button type="button" class="btn small danger" data-fin-delete="'+esc(entry.id)+'">Delete</button></div>';
