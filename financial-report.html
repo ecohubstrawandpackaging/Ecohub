@@ -67,6 +67,12 @@ function receivableRollForward(period){
   const rows=quotes.filter(activeReceivable).map(q=>{const t=totals(q),activated=receivableDate(q);if(!activated||activated>end||t.grand<=0)return null;const beginning=activated<start?Math.max(0,t.grand-paidThrough(q,priorEnd)):0,newReceivable=activated>=start?t.grand:0,ending=Math.max(0,t.grand-paidThrough(q,end)),collections=Math.max(0,beginning+newReceivable-ending);return{q,activated,beginning,newReceivable,collections,ending}}).filter(Boolean);
   const sum=k=>rows.reduce((s,r)=>s+N(r[k]),0);return{rows,beginning:sum('beginning'),newReceivables:sum('newReceivable'),collectionsApplied:sum('collections'),ending:sum('ending')};
 }
+function renderReceivables(){
+  const r=model?.receivables||{rows:[],beginning:0,newReceivables:0,collectionsApplied:0,ending:0};
+  setMoney('rBeginning',r.beginning);setMoney('rNew',r.newReceivables);setMoney('rCollected',r.collectionsApplied);setMoney('rEnding',r.ending);
+  const rows=(r.rows||[]).slice().sort((a,b)=>String(b.activated||'').localeCompare(String(a.activated||''))||String(b.q?.number||'').localeCompare(String(a.q?.number||'')));
+  $('receivableRows').innerHTML=rows.length?rows.map(x=>{const settled=N(x.ending)<=.004,status=settled?'Settled':N(x.collections)>0?'Partially Collected':'Outstanding';return `<tr><td>${esc(x.activated||'—')}</td><td><b>${esc(x.q?.number||'—')}</b></td><td>${esc(client(x.q||{}))}</td><td class="num">${money(x.beginning)}</td><td class="num">${money(x.newReceivable)}</td><td class="num green">${money(x.collections)}</td><td class="num ${settled?'':'red'}"><b>${money(x.ending)}</b></td><td><span class="pill ${settled?'good':N(x.collections)>0?'warn':'bad'}">${status}</span></td></tr>`}).join(''):'<tr><td colspan="8"><div class="empty">No receivable activity for this period.</div></td></tr>';
+}
 function calculate(){
   const completed=quotes.filter(done).filter(q=>selectedMonth==='ALL'||month(q)===selectedMonth).map(q=>({q,t:totals(q)}));
   const erows=expenses.filter(x=>N(x.amount)>0&&(selectedMonth==='ALL'||expenseDate(x).slice(0,7)===selectedMonth));
