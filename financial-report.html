@@ -73,7 +73,15 @@ function renderReceivables(){
   const rows=(r.rows||[]).slice().sort((a,b)=>String(b.activated||'').localeCompare(String(a.activated||''))||String(b.q?.number||'').localeCompare(String(a.q?.number||'')));
   $('receivableRows').innerHTML=rows.length?rows.map(x=>{const settled=N(x.ending)<=.004,status=settled?'Settled':N(x.collections)>0?'Partially Collected':'Outstanding';return `<tr><td>${esc(x.activated||'—')}</td><td><b>${esc(x.q?.number||'—')}</b></td><td>${esc(client(x.q||{}))}</td><td class="num">${money(x.beginning)}</td><td class="num">${money(x.newReceivable)}</td><td class="num green">${money(x.collections)}</td><td class="num ${settled?'':'red'}"><b>${money(x.ending)}</b></td><td><span class="pill ${settled?'good':N(x.collections)>0?'warn':'bad'}">${status}</span></td></tr>`}).join(''):'<tr><td colspan="8"><div class="empty">No receivable activity for this period.</div></td></tr>';
 }
-function calculate(){
+function auditedDistribution(data){
+  if(selectedMonth==='ALL')return{...data,audited:false};
+  const payout=payouts.filter(x=>x&&x.period===selectedMonth&&x.calculationSnapshot).sort((a,b)=>String(b.createdAt||b.date||'').localeCompare(String(a.createdAt||a.date||'')))[0];
+  if(!payout)return{...data,audited:false};
+  const snap=payout.calculationSnapshot||{},distributable=N(snap.profitAfterVehicle??snap.profitAfterXander),vehicleDue=N(snap.vehiclePayable),xander=N(snap.xanderCommission);
+  return{...data,audited:true,auditPayout:payout,xander,afterXander:N(snap.profitAfterXander),vehicleDue,distributable,targets:{xander,vehicle_payable:vehicleDue,marketing:distributable*.10,payables:distributable*.10,rence:distributable*.40,lance:distributable*.40}};
+}
+function calculate(){return auditedDistribution(calculateCurrent())}
+function calculateCurrent(){
   const completed=quotes.filter(done).filter(q=>selectedMonth==='ALL'||month(q)===selectedMonth).map(q=>({q,t:totals(q)}));
   const erows=expenses.filter(x=>N(x.amount)>0&&(selectedMonth==='ALL'||expenseDate(x).slice(0,7)===selectedMonth));
   const relatedByQuote=new Map();for(const x of erows){if(x&&x.allocationScope==='transaction_related'){const key=String(x.relatedQuotationId||x.relatedQuotationNumber||'').trim();if(key)relatedByQuote.set(key,(relatedByQuote.get(key)||0)+N(x.amount))}}
