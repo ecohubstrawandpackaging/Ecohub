@@ -44,7 +44,7 @@ async function inject(E,container){
    '</tbody></table></div></details>';
   const top=container.querySelector('.topbar'),anchor=top?top.nextElementSibling:container.firstElementChild;
   if(anchor)container.insertBefore(card,anchor);else container.prepend(card);
-  card.querySelector('#vehicle-open-distribution').onclick=()=>{window.location.href='profit-distribution.html'};
+  card.querySelector('#vehicle-open-distribution').onclick=()=>{window.location.href='profit-distribution.html?v=20261031-set-money-fix-v1'};
   document.documentElement.dataset.companyPayablesBuild=BUILD;
  }catch(err){console.error('Company vehicle payable card failed',err)}
  finally{loading=false}
