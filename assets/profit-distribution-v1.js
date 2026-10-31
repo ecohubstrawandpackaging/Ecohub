@@ -5,6 +5,7 @@ const sb=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRef
 const $=id=>document.getElementById(id),n=v=>Number(v)||0;
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>'₱'+n(v).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const setMoney=(id,v)=>{$(id).textContent=money(v)};
 const DEFAULT_LANCE_LIABILITY={id:'lance_founder_payable',creditor:'Lance',openingAmount:29000,originPeriod:'2026-07',repaymentStartPeriod:'2026-08'};
 const DEFAULT_VEHICLE_LIABILITY={id:'company_vehicle_payable',creditor:'Vehicle Financing',description:'Company vehicle purchase',openingAmount:75000,monthlyRepayment:3000,originPeriod:'2026-10',repaymentStartPeriod:'2026-11',allocationKey:'vehicle_payable',status:'Active'};
 let quotes=[],expenses=[],payouts=[],settings={},liability={...DEFAULT_LANCE_LIABILITY},vehicleLiability={...DEFAULT_VEHICLE_LIABILITY},selectedMonth='',current=null,currentRecipient=null;
