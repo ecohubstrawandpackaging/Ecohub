@@ -136,6 +136,24 @@
       }).sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||''))).reverse();
     }
 
+    function installManagerBanner(container,table){
+      let card=container.querySelector('[data-fin-manager-card]');
+      if(card)return;
+      card=document.createElement('section');
+      card.className='card';
+      card.dataset.finManagerCard='1';
+      card.style.cssText='border:2px solid var(--forest,#173b2b);background:var(--sage-light,#eef2e9);margin-bottom:12px';
+      card.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h3 style="margin:0">Finance Transaction Manager</h3><p style="margin:5px 0 0;color:var(--ink-soft);font-size:12px">Every ledger row can be edited/customized or deleted. Linked quotation payments, expenses, supplier payments, and transfers update their source records safely. Deleted rows have an Undo snapshot.</p></div><button type="button" class="btn primary" data-fin-show-actions>Show Edit / Delete</button></div>';
+      const host=table&&table.parentElement?table.parentElement:container;
+      host.insertBefore(card,table||host.firstChild);
+      card.querySelector('[data-fin-show-actions]').addEventListener('click',()=>{
+        const wrap=table&&table.closest('.table-wrap');
+        if(wrap)wrap.scrollTo({left:wrap.scrollWidth,behavior:'smooth'});
+        const first=table&&table.querySelector('.fin-ledger-edit,[data-fin-edit]');
+        if(first)setTimeout(()=>first.focus(),350);
+      });
+    }
+
     function enhance(container){
       if(!container) return;
       const body=container.querySelector('#fin-ledger-body');
@@ -146,7 +164,7 @@
       let actionsHead=existingActionsHead||null;
       if(headRow && !actionsHead){
         actionsHead=document.createElement('th');
-        actionsHead.textContent='Actions';
+        actionsHead.textContent='Edit / Delete';
         actionsHead.dataset.finActionsHead='1';
         headRow.appendChild(actionsHead);
       }
@@ -155,6 +173,7 @@
         actionsHead.style.cssText='position:sticky;right:0;z-index:3;background:var(--cream,#fffaf0);min-width:142px';
       }
 
+      installManagerBanner(container,table);
       installUndoButton(container,table);
       const entries=ledgerRows(container);
       const renderedRows=Array.from(body.children).filter(row=>row.tagName==='TR' && row.querySelectorAll('td').length>1);
@@ -167,7 +186,15 @@
         const builtInDelete=row.querySelector('.fin-ledger-delete');
         if(builtInEdit && builtInDelete){
           const builtInCell=builtInEdit.closest('td');
-          if(builtInCell) builtInCell.style.cssText+=';position:sticky;right:0;z-index:2;background:var(--cream,#fffaf0);min-width:142px';
+          if(builtInCell){
+            builtInCell.style.cssText+=';position:sticky;right:0;z-index:2;background:var(--cream,#fffaf0);min-width:188px';
+            if(!builtInCell.dataset.finSafeActions){
+              builtInCell.dataset.finSafeActions='1';
+              builtInCell.innerHTML='<div class="actions" style="flex-wrap:nowrap;gap:6px"><button type="button" class="btn small fin-ledger-edit">Edit / Customize</button><button type="button" class="btn small danger fin-ledger-delete">Delete</button></div>';
+              builtInCell.querySelector('.fin-ledger-edit').addEventListener('click',()=>openEditor(container,entry.id));
+              builtInCell.querySelector('.fin-ledger-delete').addEventListener('click',()=>deleteTransaction(container,entry.id));
+            }
+          }
           return;
         }
         if(row.querySelector('[data-fin-actions-cell]')) return;
@@ -176,7 +203,7 @@
         cell.dataset.finActionsCell='1';
         cell.style.cssText='position:sticky;right:0;z-index:2;background:var(--cream,#fffaf0);min-width:142px';
         cell.innerHTML='<div class="actions" style="flex-wrap:nowrap;gap:6px">'+
-          '<button type="button" class="btn small" data-fin-edit="'+esc(entry.id)+'">Edit</button>'+
+          '<button type="button" class="btn small" data-fin-edit="'+esc(entry.id)+'">Edit / Customize</button>'+
           '<button type="button" class="btn small danger" data-fin-delete="'+esc(entry.id)+'">Delete</button></div>';
         row.appendChild(cell);
         cell.querySelector('[data-fin-edit]').addEventListener('click',()=>openEditor(container,entry.id));
