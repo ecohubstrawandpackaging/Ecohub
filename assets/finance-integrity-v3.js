@@ -63,6 +63,14 @@ function boot(){
       (String(row.quotationPaymentId||'')===String(p?.id||'')||String(row.quotationNumber||'')===qno||String(row.remarks||'').includes(qno)));
   }
 
+  function quotationReferenceCandidates(q,p,ledgers){
+    const qno=String(q?.number||''),party=norm(clientName(q));
+    return ledgers.filter(row=>row&&row.transactionType==='Client Payment'&&N(row.cashIn)>0&&
+      String(row.account||'')===String(p?.account||'')&&Math.abs(N(row.cashIn)-N(p?.amount))<.004&&
+      (!party||!norm(row.clientOrSupplier)||norm(row.clientOrSupplier)===party)&&
+      (String(row.quotationPaymentId||'')===String(p?.id||'')||String(row.quotationNumber||'')===qno||String(row.remarks||'').includes(qno)));
+  }
+
   async function liveReconcileMigratedPayments(){
     if(reconciling||!E.storageListKeys||!E.storageGet||!E.storageSet||!E.storageDelete)return;
     reconciling=true;
@@ -113,10 +121,10 @@ function boot(){
       for(let i=1;i<rows.length;i++)if(Math.abs(stamp(rows[i])-stamp(rows[i-1]))<=10000)rapid.push(rows[i]);
     }
     const linkedIds=new Set();
+    for(const q of (S.quotations||[]))for(const p of (q.payments||[]))if(p?.ledgerEntryId)linkedIds.add(String(p.ledgerEntryId));
     const orphanQuoteRows=[];
     for(const q of (S.quotations||[]))for(const p of (q.payments||[])){
-      if(p?.ledgerEntryId)linkedIds.add(String(p.ledgerEntryId));
-      for(const row of quoteCandidates(q,p,ledgers))if(row.id!==p.ledgerEntryId&&!linkedIds.has(String(row.id)))orphanQuoteRows.push(row);
+      for(const row of quotationReferenceCandidates(q,p,ledgers))if(row.id!==p.ledgerEntryId&&!linkedIds.has(String(row.id)))orphanQuoteRows.push(row);
     }
     return{rapid:[...new Map(rapid.map(x=>[x.id,x])).values()],orphanQuoteRows:[...new Map(orphanQuoteRows.map(x=>[x.id,x])).values()]};
   }
@@ -131,7 +139,7 @@ function boot(){
     }
     const issues=new Set([...audit.rapid,...audit.orphanQuoteRows].map(x=>x.id));
     card.style.borderColor=issues.size?'#b42318':'var(--sage)';
-    card.innerHTML=`<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap"><div><h3 style="margin:0">Duplicate-Write Protection</h3><p style="margin:5px 0 0;color:var(--ink-soft);font-size:12px">Checks rapid double-submits and extra quotation-payment ledger rows. Exact migrated duplicates are archived before removal.</p></div><button class="btn small" type="button" data-finance-v3-recheck>Refresh &amp; Recheck</button></div><div class="actions" style="justify-content:flex-start;margin-top:10px;flex-wrap:wrap"><span class="pill ${audit.rapid.length?'red':'green'}">${audit.rapid.length} rapid duplicate rows</span><span class="pill ${audit.orphanQuoteRows.length?'red':'green'}">${audit.orphanQuoteRows.length} extra quotation rows</span></div>`;
+    card.innerHTML=`<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap"><div><h3 style="margin:0">Duplicate-Write Protection</h3><p style="margin:5px 0 0;color:var(--ink-soft);font-size:12px">Checks rapid double-submits and stale quotation-payment ledger rows even when an old duplicate has a different date. Source-linked rows are protected.</p></div><button class="btn small" type="button" data-finance-v3-recheck>Refresh &amp; Recheck</button></div><div class="actions" style="justify-content:flex-start;margin-top:10px;flex-wrap:wrap"><span class="pill ${audit.rapid.length?'red':'green'}">${audit.rapid.length} rapid duplicate rows</span><span class="pill ${audit.orphanQuoteRows.length?'red':'green'}">${audit.orphanQuoteRows.length} extra quotation rows</span></div>`;
     card.querySelector('[data-finance-v3-recheck]')?.addEventListener('click',async event=>{
       event.currentTarget.disabled=true;await liveReconcileMigratedPayments();E.renderFinance(container);
     });
