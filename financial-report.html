@@ -33,6 +33,7 @@ const URL='https://fyvogvjvivxpqztbaoct.supabase.co',KEY='sb_publishable_gnvNDN1
 const sb=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}),$=id=>document.getElementById(id),N=v=>Number(v)||0;
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>'₱'+N(v).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const setMoney=(id,v)=>{$(id).textContent=money(v)};
 const DEFAULT_LANCE_LIABILITY={id:'lance_founder_payable',creditor:'Lance',openingAmount:29000,originPeriod:'2026-07',repaymentStartPeriod:'2026-08'};
 const DEFAULT_VEHICLE_LIABILITY={id:'company_vehicle_payable',creditor:'Vehicle Financing',description:'Company vehicle purchase',openingAmount:75000,monthlyRepayment:3000,originPeriod:'2026-10',repaymentStartPeriod:'2026-11',allocationKey:'vehicle_payable',status:'Active'};
 let quotes=[],expenses=[],payouts=[],ledger=[],settings={},liability={...DEFAULT_LANCE_LIABILITY},vehicleLiability={...DEFAULT_VEHICLE_LIABILITY},selectedMonth='',model=null;
@@ -72,6 +73,12 @@ function renderReceivables(){
   setMoney('rBeginning',r.beginning);setMoney('rNew',r.newReceivables);setMoney('rCollected',r.collectionsApplied);setMoney('rEnding',r.ending);
   const rows=(r.rows||[]).slice().sort((a,b)=>String(b.activated||'').localeCompare(String(a.activated||''))||String(b.q?.number||'').localeCompare(String(a.q?.number||'')));
   $('receivableRows').innerHTML=rows.length?rows.map(x=>{const settled=N(x.ending)<=.004,status=settled?'Settled':N(x.collections)>0?'Partially Collected':'Outstanding';return `<tr><td>${esc(x.activated||'—')}</td><td><b>${esc(x.q?.number||'—')}</b></td><td>${esc(client(x.q||{}))}</td><td class="num">${money(x.beginning)}</td><td class="num">${money(x.newReceivable)}</td><td class="num green">${money(x.collections)}</td><td class="num ${settled?'':'red'}"><b>${money(x.ending)}</b></td><td><span class="pill ${settled?'good':N(x.collections)>0?'warn':'bad'}">${status}</span></td></tr>`}).join(''):'<tr><td colspan="8"><div class="empty">No receivable activity for this period.</div></td></tr>';
+  renderExpenses();
+}
+function renderExpenses(){
+  const rows=(model?.erows||[]).slice().sort((a,b)=>expenseDate(b).localeCompare(expenseDate(a)));
+  $('expenseCount').textContent=rows.length+' expense'+(rows.length===1?'':'s');
+  $('expenseRows').innerHTML=rows.length?rows.map(x=>`<tr><td>${esc(expenseDate(x)||'—')}</td><td><b>${esc(x.category||'Expense')}</b></td><td>${esc(x.description||x.payee||'—')}</td><td>${esc(x.method||'—')}</td><td>${esc(x.account||'—')}</td><td class="num red"><b>${money(x.amount)}</b></td></tr>`).join(''):'<tr><td colspan="6"><div class="empty">No recorded expenses for this period.</div></td></tr>';
 }
 function auditedDistribution(data){
   if(selectedMonth==='ALL')return{...data,audited:false};
