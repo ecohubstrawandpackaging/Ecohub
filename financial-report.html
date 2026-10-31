@@ -42,7 +42,7 @@ const positivePayments=q=>(q?.payments||[]).filter(p=>N(p?.amount)>0);
 const paymentDate=p=>String(p?.financialReportingDate||p?.date||p?.createdAt||'').slice(0,10);
 const historicalSettled=q=>!!q?.historicalSettled&&N(q?.historicalSettlementAmount)>0&&!!String(q?.historicalSettlementDate||'').slice(0,10);
 const fulfilled=q=>['completed','delivered'].includes(orderStatus(q));
-const fullyPaid=q=>{const t=totals(q);return t.grand>0&&positivePayments(q).length>0&&t.balance<=.004};
+const fullyPaid=q=>{const t=totals(q);return t.grand>0&&(positivePayments(q).length>0||historicalSettled(q))&&t.balance<=.004};
 const done=q=>fulfilled(q)&&fullyPaid(q);
 function finalPaymentDate(q){const dates=positivePayments(q).map(paymentDate).concat(historicalSettled(q)?[String(q.historicalSettlementDate).slice(0,10)]:[]).filter(Boolean).sort();return dates.length?dates[dates.length-1]:''}
 function fulfillmentDate(q){return orderStatus(q)==='completed'?String(q?.completedDate||q?.completedAt||q?.deliveredDate||'').slice(0,10):String(q?.deliveredDate||'').slice(0,10)}
