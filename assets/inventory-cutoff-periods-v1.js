@@ -176,7 +176,7 @@ function boot(){
     ensureLoaded().then(()=>renderPanel(container));
     return result;
   };
-  ensureLoaded();
+  // Load only when Inventory is opened after authentication and core data loading.
   console.log('Semi-monthly inventory cut-off periods v1 installed');
 }
 
