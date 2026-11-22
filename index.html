@@ -12,7 +12,7 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
 <div id="ecohub-loader"><div class="spin"></div><b>Loading EcoHub…</b><br><small>Connecting to the business system.</small></div>
 <script>
 (async()=>{
-    const BUILD='20261108-supplier-document-workflow-v2';
+    const BUILD='20261122-quotation-completion-month';
   const box=document.getElementById('ecohub-loader');
   try{
     const paths=['assets/ecohub-v7-p01.txt', 'assets/ecohub-v7-p02.txt', 'assets/ecohub-v7-p03.txt', 'assets/ecohub-v7-p04.txt', 'assets/ecohub-v7-p05.txt', 'assets/ecohub-v7-p06.txt', 'assets/ecohub-v7-p07.txt', 'assets/ecohub-v7-p08.txt', 'assets/ecohub-v7-p09.txt'];
@@ -26,6 +26,14 @@ html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacS
     for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
     if(!('DecompressionStream' in window)) throw new Error('Please update Safari/Chrome to open EcoHub.');
     let html=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+
+    // Report completed quotations in their completion month.
+    html=html.replace("    const originalKey = E.monthKey(q.date);\n    if(originalKey===selectedKey) return true;","    if(q.orderStatus==='Completed') return E.monthKey(q.completedDate || q.date)===selectedKey;\n    const originalKey = E.monthKey(q.date);\n    if(originalKey===selectedKey) return true;");
+    html=html.replace("Completed and fully paid transactions remain only in their original month.","Completed quotations appear in their completion month.");
+    html=html.replace("<h2>Quotations \u2014 ${quotationMonthLabel()}</h2>","<h2>Quotations \u2014 ${quotationMonthLabel()}</h2><p>Completed this month \u00b7 ${state.quotations.filter(q=>q.orderStatus==='Completed' && E.monthKey(q.completedDate||q.date)===E.monthKeyOf(state.selectedMonth)).length}</p>");
+    html=html.replace("<th>Quotation No.</th><th>Date</th><th>Client</th>","<th>Quotation No.</th><th>Quotation Date</th><th>Completed Date</th><th>Client</th>");
+    html=html.replace("                  <td>${escapeHtml(q.date||'')}</td>\n                  <td>${escapeHtml(q.company||q.customer||'\u2014')}</td>","                  <td>${escapeHtml(q.date||'')}</td>\n                  <td>${q.orderStatus==='Completed' ? escapeHtml(q.completedDate||q.date||'\u2014') : '\u2014'}</td>\n                  <td>${escapeHtml(q.company||q.customer||'\u2014')}</td>");
+    html=html.replace("<td colspan=\"8\"><div class=\"empty-state\">No quotations for this month","<td colspan=\"9\"><div class=\"empty-state\">No quotations for this month");
 
     const coreFix=`<script>(function(){'use strict';
       const BUILD='${BUILD}';
