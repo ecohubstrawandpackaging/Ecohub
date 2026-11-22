@@ -2,7 +2,7 @@
   'use strict';
   let E=null;
   let scheduled=false;
-  let selectedGroup='active';
+  let selectedGroup='all';
   const norm=value=>String(value||'').trim().toLowerCase().replace(/\s+/g,' ');
   const GROUPS=[
     ['active','Active Orders'],['pending','Pending / Confirmation'],['production','Production'],
@@ -75,7 +75,7 @@
     });
     let empty=table.querySelector('[data-status-group-empty]');
     if(!visible){
-      if(!empty){empty=document.createElement('tr');empty.dataset.statusGroupEmpty='1';empty.innerHTML='<td colspan="8"><div class="empty-state">No quotations in this status category.</div></td>';table.tBodies[0].appendChild(empty)}
+      if(!empty){empty=document.createElement('tr');empty.dataset.statusGroupEmpty='1';empty.innerHTML='<td colspan="9"><div class="empty-state">No quotations in this status category.</div></td>';table.tBodies[0].appendChild(empty)}
       empty.style.display='';
     }else if(empty) empty.style.display='none';
     container.querySelectorAll('[data-quotation-status-group]').forEach(button=>{
